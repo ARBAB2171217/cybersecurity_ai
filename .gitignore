@@ -1,0 +1,21 @@
+# Local environment files
+backend/.env
+frontend/.env.local
+
+# Dependency directories
+backend/.venv
+backend/env/
+frontend/node_modules/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+
+# Python caches and outputs
+__pycache__/
+*.pyc
+backend/__pycache__/
+backend/app/__pycache__/
+
+# OS files
+.DS_Store

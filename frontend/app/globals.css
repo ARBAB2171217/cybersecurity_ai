@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root, .dark {
+    /* Premium Enterprise SaaS Theme - Dark First */
+    /* Background: #0A0F1C */
+    --background: 223 47% 7%;
+    /* Text Primary: #F5F7FA */
+    --foreground: 216 33% 97%;
+    
+    /* Surface: #101827 */
+    --surface: 219 42% 11%;
+    /* Cards: #141C2F */
+    --card: 222 40% 13%;
+    --card-foreground: 216 33% 97%;
+    
+    /* Elevated Cards: #1A2438 */
+    --popover: 220 37% 16%;
+    --popover-foreground: 216 33% 97%;
+    
+    /* Primary Accent: #4F7CFF (Royal Blue) */
+    --primary: 225 100% 65%;
+    --primary-foreground: 216 33% 97%;
+    
+    /* Secondary Accent: #53C6F8 */
+    --secondary: 198 93% 65%;
+    --secondary-foreground: 223 47% 7%;
+    
+    /* Text Muted: #7B8798 */
+    --muted: 215 14% 54%;
+    --muted-foreground: 214 25% 77%; /* Secondary Text */
+    
+    /* AI Accent: #7A5AF8 */
+    --accent: 252 92% 66%;
+    --accent-foreground: 216 33% 97%;
+    
+    /* Danger: #F05454 */
+    --destructive: 0 84% 64%;
+    --destructive-foreground: 216 33% 97%;
+
+    /* Success: #27C47A */
+    --success: 152 67% 46%;
+    --success-foreground: 223 47% 7%;
+    
+    /* Warning: #F6B84A */
+    --warning: 38 92% 63%;
+    --warning-foreground: 223 47% 7%;
+    
+    /* Borders: rgba(255,255,255,0.08) */
+    --border: 0 0% 100%;
+    /* We will use border-white/10 or border opacity utilities */
+    
+    --ring: 225 100% 65%; /* Blue focus ring */
+    
+    --radius: 1rem; /* 16px buttons */
+    --radius-card: 1.375rem; /* 22px cards */
+  }
+}
+
+@layer base {
+  * {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Elegant Enterprise Glassmorphism */
+.glass {
+  background: rgba(16, 24, 39, 0.6); /* Surface color with opacity */
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.2);
+}
+
+.glass-card {
+  background: rgba(20, 28, 47, 0.7); /* Card color with opacity */
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-card);
+}
+
+.glass-elevated {
+  background: rgba(26, 36, 56, 0.8); /* Elevated card */
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 48px -12px rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-card);
+}

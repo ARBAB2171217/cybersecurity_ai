@@ -1,0 +1,56 @@
+/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/easyocr/utils.py:9: UserWarning: A NumPy version >=2.0.0 and <2.8.0 is required for this version of SciPy (detected version 1.26.4)
+  from scipy import ndimage
+Using CPU. Note: This module is much faster with a GPU.
+/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/torch/ao/nn/quantized/dynamic/modules/rnn.py:162: UserWarning: torch.quantize_per_tensor, torch.quantize_per_channel and other quantized tensor creation functions that produce tensors with dtype torch.quint8, torch.qint8, and torch.qint32 are deprecated and will be removed in a future PyTorch release. Please see https://github.com/pytorch/pytorch/issues/184982 for more information. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/quantized/Quantizer.cpp:111.)
+  w_ih = torch.quantize_per_tensor(
+Failed to scan embedded QR code: No module named 'pyzbar'
+Gemini Screenshot Analysis failed: 404 models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.
+Traceback (most recent call last):
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/api_core/grpc_helpers.py", line 55, in error_remapped_callable
+    return callable_(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/grpc/_channel.py", line 1159, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/grpc/_channel.py", line 990, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)  # pytype: disable=not-instantiable
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.NOT_FOUND
+	details = "models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods."
+	debug_error_string = "NOT_FOUND:models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods."
+>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/app/ai/pipelines/gemini_pipeline.py", line 314, in run_gemini_screenshot_analysis
+    response = model.generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/generativeai/generative_models.py", line 262, in generate_content
+    response = self._client.generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/client.py", line 812, in generate_content
+    response = rpc(
+               ^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/api_core/gapic_v1/method.py", line 128, in __call__
+    return wrapped_func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/api_core/retry/retry_unary.py", line 294, in retry_wrapped_func
+    return retry_target(
+           ^^^^^^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/api_core/retry/retry_unary.py", line 156, in retry_target
+    next_sleep = _retry_error_helper(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/api_core/retry/retry_base.py", line 216, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/api_core/retry/retry_unary.py", line 147, in retry_target
+    result = target()
+             ^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/api_core/timeout.py", line 130, in func_with_timeout
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arbab/Documents/ cybersecurity_ai/backend/.venv/lib/python3.12/site-packages/google/api_core/grpc_helpers.py", line 57, in error_remapped_callable
+    raise exceptions.from_grpc_error(exc) from exc
+google.api_core.exceptions.NotFound: 404 models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.
+SUCCESS: ['ocr_text', 'ocr_confidence', 'blocks', 'category', 'confidence', 'detected_elements', 'metadata', 'entities', 'risk_analysis', 'qr_intelligence', 'url_intelligence', 'ai_analysis', 'timeline']

@@ -1,0 +1,88 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: cybershield_db
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cybershield_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: cybershield_redis
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    command: >
+      sh -c "redis-server --requirepass $$REDIS_PASSWORD"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cybershield_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cybershield_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    networks:
+      - cybershield_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+        - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=749993405434-eh6vstf909a862qm18m14b2qf68di5tp.apps.googleusercontent.com
+    container_name: cybershield_frontend
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env.local
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - cybershield_net
+
+volumes:
+  postgres_data:
+    name: cybershield_postgres_data
+  redis_data:
+    name: cybershield_redis_data
+
+networks:
+  cybershield_net:
+    name: cybershield_network
+    driver: bridge
