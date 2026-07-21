@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import String, Boolean
+import datetime
+from sqlalchemy import String, Boolean, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base, TimestampMixin, SoftDeleteMixin
 
@@ -53,6 +54,27 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         Boolean,
         default=False,
         nullable=False
+    )
+    last_login: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+    last_device: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True
+    )
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer,
+        server_default="0",
+        nullable=False
+    )
+    otp_hash: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True
+    )
+    otp_expiry: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
     )
 
     # Relationships

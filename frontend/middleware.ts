@@ -48,6 +48,18 @@ function getRoleFromToken(token: string): string | null {
   }
 }
 
+  const role = token ? getRoleFromToken(token) : null;
+
+  // Prevent regular users from accessing admin routes
+  if (token && pathname.startsWith("/admin") && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Prevent admins from accessing user routes (optional, but good practice, let's just protect admin routes)
+  if (token && pathname.startsWith("/dashboard") && (role === "ADMIN" || role === "SUPER_ADMIN")) {
+    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+  }
+
   // Redirect authenticated users trying to access public auth forms or landing page to their default dashboard
   if (token && (pathname === "/" || pathname === "/forgot-password" || pathname === "/reset-password")) {
     const role = getRoleFromToken(token);

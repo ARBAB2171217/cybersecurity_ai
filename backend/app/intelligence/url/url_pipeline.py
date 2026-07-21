@@ -57,6 +57,7 @@ class URLIntelligencePipeline(IntelligencePipeline):
     async def extract_entities(self, parsed_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract Domain Intel (WHOIS), IP detection, and static HTML content indicators."""
         import tldextract
+        from app.intelligence.url.forensics import gather_forensics
         
         final_url = parsed_data.get("final_url", "")
         domain = parsed_data.get("domain", "")
@@ -68,9 +69,18 @@ class URLIntelligencePipeline(IntelligencePipeline):
         # TLD Extraction
         ext = tldextract.extract(final_url)
         
-        # WHOIS Domain Intelligence Mock
-        # In a real environment, we'd use python-whois and validate dates.
+        forensics = await gather_forensics(domain, final_url)
+        
+        # WHOIS Domain Intelligence Mock fallback or real
         is_new_domain = False
+        domain_age = forensics.get("whois", {}).get("domain_age_days", "Unavailable")
+        if isinstance(domain_age, str) and "days" in domain_age:
+            try:
+                days = int(domain_age.split()[0])
+                if days < 30: is_new_domain = True
+            except:
+                pass
+        
         if "new" in ext.domain or "scam" in ext.domain or "fake" in ext.domain:
             is_new_domain = True
             
@@ -103,7 +113,8 @@ class URLIntelligencePipeline(IntelligencePipeline):
             "tld": ext.suffix,
             "is_ip": is_ip,
             "is_new_domain": is_new_domain,
-            "content_indicators": content_indicators
+            "content_indicators": content_indicators,
+            "forensics": forensics
         }
 
     async def run_rules(self, parsed_data: Dict[str, Any], entities: Dict[str, Any]) -> Dict[str, Any]:
@@ -427,6 +438,7 @@ class URLIntelligencePipeline(IntelligencePipeline):
             "privacy_risk": privacy_risk,
             "financial_risk": financial_risk,
             "download_risk": download_risk,
+            "forensics": self.context.get("evidence", {}).get("entities", {}).get("forensics", {}),
             "threat_intel": threat_intel,
             "triggered_rules": rule_results.get("failed_checks", []) + rule_results.get("warning_checks", []),
             "evidence_collected": evidence_collected,

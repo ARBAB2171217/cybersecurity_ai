@@ -143,11 +143,11 @@ export default function DetectionResultPage() {
         </div>
       </div>
 
-      {report.rawAiResponse?.qr_details?.qr_detected && report.rawAiResponse.qr_details.risk_analysis ? (
+      {report.evidenceType === "QR" || report.evidenceType === "QR Code" || report.selectedPipeline === "QR" || (report.rawAiResponse?.qr_details) ? (
         <div className="mt-6">
           <QRResultView report={report} />
         </div>
-      ) : report.evidenceType && report.evidenceType !== "Currency Note" && report.evidenceType !== "QR Code" ? (
+      ) : report.evidenceType && report.evidenceType !== "Currency Note" && report.evidenceType !== "Currency" && report.selectedPipeline !== "Currency" ? (
         <div className="mt-6">
           <ScreenshotResultView report={report} />
         </div>
@@ -508,7 +508,7 @@ export default function DetectionResultPage() {
                     className="w-full h-auto block object-cover"
                   />
                   {ai?.feature_highlights?.map((highlight, idx) => {
-                    const [ymin, xmin, ymax, xmax] = highlight.box_2d;
+                    const [ymin, xmin, ymax, xmax] = highlight?.box_2d || [0, 0, 0, 0];
                     if (ymin === 0 && xmin === 0 && ymax === 0 && xmax === 0) return null;
                     const top = ymin / 10;
                     const left = xmin / 10;

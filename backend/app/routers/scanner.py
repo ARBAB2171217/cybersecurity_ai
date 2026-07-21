@@ -8,7 +8,6 @@ from app.models.user import User
 from app.services.upload_service import upload_service
 from app.services.report_service import ReportService
 from app.services.ai_detection_service import AIDetectionService
-from app.services.classification_service import EvidenceClassificationService
 from app.services.pipeline_router_service import PipelineRouterService
 from app.services.unified_report_service import UnifiedReportService
 from app.ai.pipelines.preprocessing import preprocess_universal_image
@@ -56,17 +55,16 @@ async def universal_scan(
     import asyncio
 
     try:
-        # 2. Universal preprocessing happens before any classifier or pipeline.
-        preprocessing = await asyncio.to_thread(preprocess_universal_image, raw_local_path)
+        # 3. Deterministic multi-stage classification orchestrator
+        from app.services.image_classifier_service import ImageClassifierService
+        classification = await asyncio.to_thread(
+            ImageClassifierService.orchestrate,
+            raw_local_path
+        )
+        preprocessing = classification.get("preprocessing", {})
         analysis_path = preprocessing.get("processed_path") or raw_local_path
         analysis_url = f"/media/uploads/{os.path.basename(analysis_path)}"
-
-        # 3. Deterministic classification. Gemini is not called here.
-        classification = await asyncio.to_thread(
-            EvidenceClassificationService.classify,
-            analysis_path,
-            preprocessing,
-        )
+        
     except ValueError as e:
         if raw_local_path and os.path.exists(raw_local_path):
             try:
@@ -149,6 +147,21 @@ async def universal_scan(
 
         report.pipeline_used = router_output.get("pipeline_used")
         report.processing_time = router_output.get("processing_time")
+        
+        # Persist raw output and determine status
+        raw_output = router_output.get("raw_output", {})
+        if raw_output and isinstance(raw_output, dict):
+            report.raw_ai_response = raw_output
+            report.status = "APPROVED"
+            
+            # Use appropriate risk score heuristics based on pipeline output
+            risk_score = raw_output.get("risk_score") or raw_output.get("risk_analysis", {}).get("risk_score", 0)
+            report.is_counterfeit = bool(risk_score >= 70)
+            
+            ai_confidence = raw_output.get("ai_analysis", {}).get("ai_confidence") or raw_output.get("confidence")
+            if ai_confidence is not None:
+                report.confidence_score = float(ai_confidence)
+
         await report_service.report_repo.db.commit()
     except AttributeError:
         pass
@@ -172,10 +185,11 @@ async def universal_scan(
 
     # 6. Normalize Response
     unified_response = UnifiedReportService.normalize(
-        detected_type=detected_type,
-        classification_confidence=confidence,
+        classification=classification,
         router_output=router_output
     )
+    if report and hasattr(report, "id"):
+        unified_response["report_id"] = str(report.id)
 
     return StandardResponse(
         success=True,

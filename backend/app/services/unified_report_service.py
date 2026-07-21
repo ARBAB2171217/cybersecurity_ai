@@ -2,89 +2,95 @@ from typing import Dict, Any
 
 class UnifiedReportService:
     @staticmethod
-    def normalize(detected_type: str, classification_confidence: float, router_output: Dict[str, Any]) -> Dict[str, Any]:
+    def normalize(classification: Dict[str, Any], router_output: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Normalizes outputs from different pipelines into a single Unified schema.
+        Enforces a strict enterprise JSON contract explicitly separating 
+        Classification from Intelligence Risk Analysis.
         """
         raw = router_output.get("raw_output", {})
         pipeline_used = router_output.get("pipeline_used", "Unknown Pipeline")
-        processing_time = router_output.get("processing_time", 0.0)
-
-        # Base schema mapping
+        
+        explainability = classification.get("explainability", {})
+        
+        # 1. Classification Block
         unified = {
-            "DetectedType": detected_type,
-            "detected_type": detected_type,
-            "confidence": classification_confidence,
-            "risk_score": 0,
-            "threat_level": "UNKNOWN",
-            "threat_category": "General",
-            "evidence": [],
-            "ai_summary": "Analysis completed.",
-            "recommendations": [],
-            "pipeline_used": pipeline_used,
-            "processing_time": processing_time,
-            "preprocessing": raw.get("preprocessing"),
-            "url_intelligence": raw.get("url_intelligence"),
+            "classification": {
+                "detected_type": classification.get("detected_type", "Unknown"),
+                "subtype": raw.get("category", classification.get("detected_type", "Unknown")),
+                "confidence": classification.get("confidence", 0.0),
+                "pipeline": pipeline_used,
+                "processing_time_ms": explainability.get("processing_time_ms", 0),
+                "matched_features": explainability.get("matched_features", []),
+                "rejected_classes": explainability.get("rejected_classes", []),
+            },
+            "classification_evidence": [],
+            "analysis": {
+                "risk_score": 0,
+                "threat_level": "UNKNOWN",
+                "triggered_rules": [],
+                "evidence": [],
+                "recommendations": []
+            }
         }
-
-        # Handling errors during pipeline execution
+        
+        # 2. Extract classification evidence
+        if "ocr_result" in classification:
+            ocr_text = classification["ocr_result"].get("raw_text", "")
+            if ocr_text:
+                unified["classification_evidence"].append(f"OCR Extracted {len(ocr_text)} characters")
+                
+        # 3. Handle Pipeline Errors
         if "error" in raw:
-            unified["ai_summary"] = f"Pipeline failed: {raw['error']}"
-            unified["threat_level"] = "ERROR"
+            unified["analysis"]["recommendations"].append(f"Pipeline failed: {raw['error']}")
+            unified["analysis"]["threat_level"] = "ERROR"
             return unified
-
-        # Map Screenshot Pipeline format
-        if pipeline_used == "Screenshot Pipeline":
+            
+        # 4. Intelligence Module Mapping
+        if pipeline_used == "Screenshot Pipeline" or pipeline_used == "Document Pipeline":
             risk = raw.get("risk_analysis", {})
-            unified["risk_score"] = risk.get("risk_score", raw.get("risk_score", 0))
-            unified["threat_level"] = risk.get("threat_level", raw.get("threat_level", "UNKNOWN"))
-            unified["threat_category"] = raw.get("category", detected_type)
-            unified["ai_summary"] = raw.get("ai_analysis", {}).get("threat_summary", "Extracted text and entities successfully.")
-            if "ocr_text" in raw:
-                unified["evidence"].append(f"Text length: {len(raw['ocr_text'])}")
-            unified["evidence"].extend([rule.get("name", "") for rule in risk.get("triggered_rules", []) if isinstance(rule, dict)])
-            unified["recommendations"] = raw.get("ai_analysis", {}).get("prevention_tips", [])
-
-        elif pipeline_used == "Document Pipeline":
-            risk = raw.get("risk_analysis", {})
-            unified["risk_score"] = risk.get("risk_score", 0)
-            unified["threat_level"] = risk.get("threat_level", "UNKNOWN")
-            unified["threat_category"] = raw.get("category", "Document")
-            unified["ai_summary"] = raw.get("ai_analysis", {}).get("threat_summary", "Document OCR analysis completed.")
-            if "ocr_text" in raw:
-                unified["evidence"].append(f"Text length: {len(raw['ocr_text'])}")
-            unified["recommendations"] = raw.get("ai_analysis", {}).get("prevention_tips", [])
-
-        # Map QR Pipeline format
+            unified["analysis"]["risk_score"] = risk.get("risk_score", raw.get("risk_score", 0))
+            unified["analysis"]["threat_level"] = risk.get("threat_level", raw.get("threat_level", "UNKNOWN"))
+            unified["analysis"]["triggered_rules"] = risk.get("triggered_rules", [])
+            unified["analysis"]["recommendations"] = raw.get("ai_analysis", {}).get("prevention_tips", [])
+            unified["analysis"]["evidence"].append(raw.get("ai_analysis", {}).get("threat_summary", "Analysis completed."))
+            
         elif pipeline_used == "QR Pipeline":
             risk = raw.get("risk_analysis", {})
-            unified["risk_score"] = risk.get("risk_score", raw.get("risk_score", 0))
-            unified["threat_level"] = risk.get("risk_level", raw.get("threat_level", "UNKNOWN"))
-            unified["threat_category"] = "QR Risk"
-            unified["ai_summary"] = raw.get("summary", "QR Analysis Complete")
-            unified["evidence"] = risk.get("failed_checks", []) + risk.get("warning_checks", [])
+            unified["analysis"]["risk_score"] = risk.get("risk_score", raw.get("risk_score", 0))
+            unified["analysis"]["threat_level"] = risk.get("risk_level", raw.get("threat_level", "UNKNOWN"))
+            
+            failed = risk.get("failed_checks", [])
+            warnings = risk.get("warning_checks", [])
+            
+            unified["analysis"]["triggered_rules"] = [{"name": c} for c in failed + warnings]
+            
             recommendation = raw.get("recommendation") or risk.get("prevention_guidance")
-            unified["recommendations"] = recommendation if isinstance(recommendation, list) else ([recommendation] if recommendation else [])
-
-        # Map Currency Pipeline format
+            unified["analysis"]["recommendations"] = recommendation if isinstance(recommendation, list) else ([recommendation] if recommendation else [])
+            unified["analysis"]["evidence"].append(raw.get("summary", "QR Analysis Complete"))
+            
+            if "qr_details" in classification and classification["qr_details"]:
+                unified["classification"]["subtype"] = classification["qr_details"].get("payload_type", "URL")
+                
         elif pipeline_used == "Currency Pipeline":
-            unified["risk_score"] = raw.get("risk_score", 0)
-            unified["threat_level"] = raw.get("status", "UNKNOWN")
-            unified["threat_category"] = "Counterfeit Currency"
-            unified["ai_summary"] = raw.get("AI Explanation") or raw.get("summary", "Currency Analysis Complete")
-            unified["evidence"] = raw.get("Evidence", []) or raw.get("reasons", [])
+            unified["analysis"]["risk_score"] = raw.get("risk_score", 0)
+            unified["analysis"]["threat_level"] = raw.get("status", "UNKNOWN")
+            
+            evidence = raw.get("Evidence", []) or raw.get("reasons", [])
+            unified["analysis"]["evidence"] = evidence
+            
+            unified["analysis"]["triggered_rules"] = [{"name": "Counterfeit Indicator", "description": e} for e in evidence if "missing" in e.lower() or "suspicious" in e.lower()]
+            
             if "Recommendation" in raw:
-                unified["recommendations"] = [raw["Recommendation"]]
+                unified["analysis"]["recommendations"] = [raw["Recommendation"]]
             elif "recommendation" in raw:
-                unified["recommendations"] = [raw["recommendation"]]
-
-        elif pipeline_used == "Generic Vision Analysis":
-            unified["risk_score"] = raw.get("risk_score", 0)
-            unified["threat_level"] = raw.get("status", "UNKNOWN")
-            unified["threat_category"] = "Unknown"
-            unified["ai_summary"] = raw.get("summary", "Image was not confidently classified.")
-            unified["evidence"] = [f"OCR text length: {len(raw.get('ocr_text', ''))}"]
+                unified["analysis"]["recommendations"] = [raw["recommendation"]]
+                
+        else:
+            unified["analysis"]["risk_score"] = raw.get("risk_score", 0)
+            unified["analysis"]["threat_level"] = raw.get("status", "UNKNOWN")
+            unified["analysis"]["evidence"] = [raw.get("summary", "Image was not confidently classified.")]
+            
             recommendation = raw.get("recommendation")
-            unified["recommendations"] = [recommendation] if recommendation else []
-
+            unified["analysis"]["recommendations"] = [recommendation] if recommendation else []
+            
         return unified

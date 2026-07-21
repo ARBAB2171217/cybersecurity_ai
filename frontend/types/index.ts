@@ -29,6 +29,7 @@ export interface Admin {
  */
 export interface Report {
   id: string;
+  report_id?: string;
   userId?: string;
   
   category: string;

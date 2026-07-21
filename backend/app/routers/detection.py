@@ -140,6 +140,7 @@ class URLAnalyzeResponse(BaseModel):
     privacy_risk: str
     financial_risk: str
     download_risk: str
+    forensics: Optional[dict] = None
     threat_intel: dict
     triggered_rules: list[str]
     evidence_collected: list[str]
@@ -154,6 +155,7 @@ class URLAnalyzeResponse(BaseModel):
 async def analyze_url_gemini(
     payload: URLAnalyzeRequest,
     current_user: User = Depends(get_current_user),
+    report_service: ReportService = Depends(get_report_service),
 ):
     """
     Uses the new URLIntelligencePipeline.
@@ -173,6 +175,7 @@ async def analyze_url_gemini(
         privacy_risk=result.get("privacy_risk", "Unknown"),
         financial_risk=result.get("financial_risk", "Unknown"),
         download_risk=result.get("download_risk", "Unknown"),
+        forensics=result.get("forensics"),
         threat_intel=result.get("threat_intel", {}),
         triggered_rules=result.get("triggered_rules", []),
         evidence_collected=result.get("evidence_collected", []),
@@ -183,6 +186,21 @@ async def analyze_url_gemini(
         ai_confidence=result.get("ai_confidence")
     )
         
+    from app.models.report import ReportStatus
+    report_data = {
+        "user_id": current_user.id,
+        "category": "URL Intelligence",
+        "title": f"URL Scan: {payload.originalUrl[:50]}",
+        "evidence_type": "URL",
+        "detected_type": "URL",
+        "pipeline_used": "URL",
+        "status": ReportStatus.APPROVED.value,
+        "raw_ai_response": response_data.model_dump(),
+        "is_counterfeit": True if response_data.final_risk_score >= 70 else False,
+        "confidence_score": response_data.ai_confidence or 0.0
+    }
+    await report_service.report_repo.create(report_data)
+
     return StandardResponse(
         success=True,
         message="URL intelligence pipeline completed successfully.",

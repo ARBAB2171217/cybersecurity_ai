@@ -34,6 +34,12 @@ COPY --from=builder /app/wheels /wheels
 COPY --from=builder /app/requirements.txt .
 RUN pip install --no-cache /wheels/*
 
+# Pre-download EasyOCR models so they are baked into the image.
+# Without this, the first scan request triggers a ~100MB+ download
+# that blocks the pipeline and causes frontend timeouts.
+RUN python3 -c "import easyocr; easyocr.Reader(['en', 'hi'], gpu=False)" \
+    && echo "EasyOCR models downloaded successfully."
+
 # Copy application code
 COPY . .
 

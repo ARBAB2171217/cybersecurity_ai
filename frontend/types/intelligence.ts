@@ -44,6 +44,7 @@ export interface AIAnalysisResult {
   ai_available: boolean;
   ai_summary: string;
   ai_confidence: number | null;
+  forensics?: any;
 }
 
 export interface IntelligenceAssessment {

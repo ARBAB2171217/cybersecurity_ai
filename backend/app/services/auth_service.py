@@ -44,20 +44,9 @@ class AuthService:
         email = request.email.strip().lower()
         existing = await self.user_repo.get_by_email(email)
         if existing:
-            # Dispatch email notifying the user of the attempt, without failing the API call
-            from app.services.email_service import email_service
-            import asyncio
-            # Assume send_account_exists_email will be implemented, or just skip it for now to prevent enumeration
+            # Prevent enumeration by returning success without giving access
+            return
             
-            # Return a fake token pair to satisfy schema but deny access to the real account
-            from app.schemas.auth import TokenResponse
-            import secrets
-            return TokenResponse(
-                access_token=f"fake.access.{secrets.token_hex(16)}", 
-                refresh_token=f"fake.refresh.{secrets.token_hex(16)}", 
-                token_type="bearer"
-            )
-
         hashed = hash_password(request.password)
         user_data = {
             "email": email,
@@ -68,26 +57,6 @@ class AuthService:
         }
         
         user = await self.user_repo.create(user_data)
-        
-        # Issue JWT Access & Refresh Tokens
-        token_pair = jwt_service.generate_token_pair(str(user.id), "USER")
-        
-        # Save refresh token in database
-        refresh_token_data = {
-            "user_id": user.id,
-            "token": token_pair.refresh_token,
-            "expires_at": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
-        }
-        await self.refresh_repo.create(refresh_token_data)
-        
-        # Save session
-        await self.session_manager.create_session(
-            token=token_pair.refresh_token,
-            user_id=user.id,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
-
         # Trigger registration OTP verification email immediately
         await otp_service.create_and_send_otp(user.email, OTPPurpose.REGISTER)
         
@@ -98,7 +67,7 @@ class AuthService:
             details={"email": email, "user_agent": user_agent}
         )
         
-        return token_pair
+        return None
 
     async def login_user(
         self,
@@ -127,12 +96,20 @@ class AuthService:
             if attempts >= 5:
                 await redis_service.set(lockout_key, "1", expire_seconds=900)  # 15 minutes lockout
                 await redis_service.delete(attempts_key)
+                await self.user_repo.update(user, {"failed_login_attempts": attempts})
                 raise HTTPException(
                     status_code=status.HTTP_423_LOCKED,
                     detail="Too many failed login attempts. This account has been locked for 15 minutes."
                 )
             else:
                 await redis_service.set(attempts_key, attempts, expire_seconds=900)
+                await self.user_repo.update(user, {"failed_login_attempts": attempts})
+                await self.audit_service.log_action(
+                    action="FAILED_LOGIN",
+                    user_id=user.id,
+                    ip_address=ip_address,
+                    details={"email": email, "user_agent": user_agent, "attempts": attempts}
+                )
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Incorrect email or password."
@@ -140,12 +117,39 @@ class AuthService:
 
         # Reset failed attempts on successful login
         await redis_service.delete(attempts_key)
+        await self.user_repo.update(user, {"failed_login_attempts": 0})
 
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account is deactivated."
             )
+
+        if not user.is_verified:
+            # Send OTP and prompt user to verify
+            await otp_service.create_and_send_otp(user.email, OTPPurpose.REGISTER)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Email not verified. A verification code has been sent to your email."
+            )
+
+        # 1. Device Recognition & Security Notifications
+        is_new_device = user.last_device is not None and user.last_device != user_agent
+        
+        if is_new_device:
+            from app.services.email_service import email_service
+            await email_service.send_unknown_device_email(user.email, user.full_name, str(user_agent), str(ip_address))
+            
+            # Require OTP for unknown devices
+            await otp_service.create_and_send_otp(user.email, OTPPurpose.LOGIN)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Login from a new device detected. A verification code has been sent to your email."
+            )
+
+        # Update last_login
+        now = datetime.datetime.now(datetime.timezone.utc)
+        await self.user_repo.update(user, {"last_login": now, "last_device": user_agent})
 
         token_pair = jwt_service.generate_token_pair(str(user.id), "USER")
         
@@ -303,6 +307,12 @@ class AuthService:
         
         # Generate new token pairs
         if token_obj.user_id:
+            await self.audit_service.log_action(
+                action="TOKEN_REFRESH",
+                user_id=token_obj.user_id,
+                ip_address=ip_address,
+                details={"user_agent": user_agent}
+            )
             token_pair = jwt_service.generate_token_pair(str(token_obj.user_id), "USER")
             refresh_token_data = {
                 "user_id": token_obj.user_id,
@@ -338,6 +348,14 @@ class AuthService:
         await self.refresh_repo.create(refresh_token_data)
         return token_pair
 
-    async def logout(self, refresh_token: str) -> None:
+    async def logout(self, refresh_token: str, ip_address: Optional[str] = None) -> None:
+        token_obj = await self.refresh_repo.get_any_by_token(refresh_token)
+        if token_obj:
+            await self.audit_service.log_action(
+                action="LOGOUT",
+                user_id=token_obj.user_id,
+                admin_id=token_obj.admin_id,
+                ip_address=ip_address
+            )
         await self.refresh_repo.revoke_token(refresh_token)
         await self.session_manager.revoke_session(refresh_token)

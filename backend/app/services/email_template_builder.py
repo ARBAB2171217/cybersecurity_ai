@@ -200,3 +200,33 @@ class EmailTemplateBuilder:
         """
         preview = '<span style="display:none;font-size:0;color:transparent;max-height:0;overflow:hidden;">Your password has been successfully updated.</span>'
         return cls.get_base_template(content, preview)
+
+    @classmethod
+    def build_unknown_device_email(cls, recipient_name: str, device_name: str, ip_address: str, location: str) -> str:
+        content = f"""
+          <h2>New Device Login Detected</h2>
+          <p>Hello {recipient_name},</p>
+          <p>We noticed a login to your CyberShield AI account from a new device.</p>
+          <ul>
+            <li><strong>Device:</strong> {device_name}</li>
+            <li><strong>IP Address:</strong> {ip_address}</li>
+            <li><strong>Location:</strong> {location}</li>
+          </ul>
+          <p>If this was you, no further action is required.</p>
+          <p style="color: #ef4444; font-weight: 600;">If you did not authorize this login, please reset your password immediately and review your active sessions.</p>
+        """
+        preview = '<span style="display:none;font-size:0;color:transparent;max-height:0;overflow:hidden;">Security Alert: New device login detected.</span>'
+        return cls.get_base_template(content, preview)
+
+    @classmethod
+    def build_google_account_linked_email(cls, recipient_name: str) -> str:
+        content = f"""
+          <h2>Google Account Linked</h2>
+          <p>Hello {recipient_name},</p>
+          <p>Your CyberShield AI account has been successfully linked to your Google Account.</p>
+          <p>You can now use "Continue with Google" for faster, secure access to your dashboard.</p>
+          <p>If you did not authorize this change, please contact our security team immediately.</p>
+        """
+        preview = '<span style="display:none;font-size:0;color:transparent;max-height:0;overflow:hidden;">Your account has been linked to Google.</span>'
+        return cls.get_base_template(content, preview)
+

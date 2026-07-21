@@ -40,10 +40,12 @@ def get_auth_service(
 def get_google_service(
     user_repo = Depends(get_user_repo),
     refresh_repo = Depends(get_refresh_repo),
-    session_repo = Depends(get_session_repo)
+    session_repo = Depends(get_session_repo),
+    audit_repo = Depends(get_audit_repo)
 ) -> GoogleOAuthService:
     session_manager = SessionManager(session_repo)
-    return GoogleOAuthService(user_repo, refresh_repo, session_manager)
+    audit_service = AuditService(audit_repo)
+    return GoogleOAuthService(user_repo, refresh_repo, session_manager, audit_service)
 
 def validate_password_strength(password: str) -> None:
     """
@@ -58,7 +60,7 @@ def validate_password_strength(password: str) -> None:
     if not any(c.isdigit() for c in password):
         raise HTTPException(status_code=400, detail="Password must contain at least one number.")
 
-@router.post("/register", response_model=StandardResponse[TokenResponse], dependencies=[Depends(auth_rate_limiter)])
+@router.post("/register", response_model=StandardResponse[None], dependencies=[Depends(auth_rate_limiter)])
 async def register(
     request: RegisterRequest,
     request_obj: Request,
@@ -71,11 +73,10 @@ async def register(
     ip_address = request_obj.client.host if request_obj.client else None
     user_agent = request_obj.headers.get("user-agent")
     
-    tokens = await service.register_user(validated, ip_address=ip_address, user_agent=user_agent)
+    await service.register_user(validated, ip_address=ip_address, user_agent=user_agent)
     return StandardResponse(
         success=True,
-        message="Registration completed successfully. Verification email sent.",
-        data=tokens
+        message="Registration completed successfully. Verification email sent."
     )
 
 @router.post("/login/user", response_model=StandardResponse[TokenResponse], dependencies=[Depends(auth_rate_limiter)])
@@ -168,7 +169,9 @@ async def send_otp(request: OTPRequest):
 @router.post("/otp/verify", response_model=StandardResponse[bool], dependencies=[Depends(auth_rate_limiter)])
 async def verify_otp(
     request: OTPVerifyRequest,
-    user_repo: UserRepository = Depends(get_user_repo)
+    request_obj: Request,
+    user_repo: UserRepository = Depends(get_user_repo),
+    audit_repo = Depends(get_audit_repo)
 ):
     """
     Verifies that the OTP code matches the cache.
@@ -188,6 +191,16 @@ async def verify_otp(
             if not was_verified:
                 from app.services.email_service import email_service
                 await email_service.send_welcome_email(user.email, user.full_name)
+                
+                # Log email verified
+                audit_service = AuditService(audit_repo)
+                ip_address = request_obj.client.host if request_obj.client else None
+                await audit_service.log_action(
+                    action="EMAIL_VERIFIED",
+                    user_id=user.id,
+                    ip_address=ip_address,
+                    details={"email": user.email}
+                )
             
     return StandardResponse(
         success=True,
@@ -236,9 +249,11 @@ async def get_me(
 
 @router.post("/logout", response_model=StandardResponse[None])
 async def logout(
+    request_obj: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     refresh_repo = Depends(get_refresh_repo),
-    session_repo = Depends(get_session_repo)
+    session_repo = Depends(get_session_repo),
+    audit_repo = Depends(get_audit_repo)
 ):
     """
     Terminates session by revoking all refresh tokens.
@@ -257,6 +272,16 @@ async def logout(
             else:
                 await refresh_repo.revoke_all_user_tokens(user_uuid)
                 await session_manager.revoke_all_user_sessions(user_uuid)
+            
+            # Audit log
+            audit_service = AuditService(audit_repo)
+            ip_address = request_obj.client.host if request_obj.client else None
+            await audit_service.log_action(
+                action="SESSION_REVOKED",
+                user_id=user_uuid if role not in ["ADMIN", "SUPER_ADMIN"] else None,
+                admin_id=user_uuid if role in ["ADMIN", "SUPER_ADMIN"] else None,
+                ip_address=ip_address
+            )
         except ValueError:
             pass
             
@@ -267,9 +292,11 @@ async def logout(
 
 @router.post("/logout/all", response_model=StandardResponse[None])
 async def logout_all(
+    request_obj: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     refresh_repo = Depends(get_refresh_repo),
-    session_repo = Depends(get_session_repo)
+    session_repo = Depends(get_session_repo),
+    audit_repo = Depends(get_audit_repo)
 ):
     """
     Terminates all sessions across all devices for the authenticated user/admin.
@@ -294,6 +321,16 @@ async def logout_all(
         await refresh_repo.revoke_all_user_tokens(user_uuid)
         await session_manager.revoke_all_user_sessions(user_uuid)
         
+    # Audit log
+    audit_service = AuditService(audit_repo)
+    ip_address = request_obj.client.host if request_obj.client else None
+    await audit_service.log_action(
+        action="ALL_SESSIONS_REVOKED",
+        user_id=user_uuid if role not in ["ADMIN", "SUPER_ADMIN"] else None,
+        admin_id=user_uuid if role in ["ADMIN", "SUPER_ADMIN"] else None,
+        ip_address=ip_address
+    )
+        
     return StandardResponse(
         success=True,
         message="Successfully logged out from all devices."
@@ -317,9 +354,11 @@ async def forgot_password(request: PasswordResetRequest, user_repo: UserReposito
 @router.post("/reset-password", response_model=StandardResponse[None], dependencies=[Depends(auth_rate_limiter)])
 async def reset_password(
     request: PasswordResetConfirmRequest,
+    request_obj: Request,
     user_repo = Depends(get_user_repo),
     refresh_repo = Depends(get_refresh_repo),
-    session_repo = Depends(get_session_repo)
+    session_repo = Depends(get_session_repo),
+    audit_repo = Depends(get_audit_repo)
 ):
     """
     Verifies the OTP code, resets the user's password, invalidates previous sessions/tokens,
@@ -352,6 +391,16 @@ async def reset_password(
     # Send confirmation email
     from app.services.email_service import email_service
     await email_service.send_password_changed_email(user.email, user.full_name)
+    
+    # Audit log
+    audit_service = AuditService(audit_repo)
+    ip_address = request_obj.client.host if request_obj.client else None
+    await audit_service.log_action(
+        action="PASSWORD_RESET",
+        user_id=user.id,
+        ip_address=ip_address,
+        details={"email": user.email}
+    )
     
     return StandardResponse(
         success=True,

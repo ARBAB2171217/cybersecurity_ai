@@ -59,8 +59,14 @@ function escapeHtml(str: string): string {
 export function QRResultView({ report, isSavedReport = false }: QRResultViewProps) {
   const { addToast } = useToast();
   
-  // Memoized extraction of QR details to avoid excessive object lookup on re-renders
-  const qrDetails = useMemo(() => report.rawAiResponse?.qr_details, [report.rawAiResponse]);
+  // Memoized extraction of QR details to handle both nested and flat payloads
+  const qrDetails = useMemo(() => {
+    if (!report.rawAiResponse) return undefined;
+    if (report.rawAiResponse.qr_details) return report.rawAiResponse.qr_details;
+    if (report.rawAiResponse.qr_detected !== undefined) return report.rawAiResponse;
+    return undefined;
+  }, [report.rawAiResponse]);
+  
   const riskAnalysis = useMemo(() => qrDetails?.risk_analysis, [qrDetails]);
 
   const [isContentExpanded, setIsContentExpanded] = useState(false);
@@ -278,13 +284,13 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
               {/* Failed Checks */}
-              {riskAnalysis.detected_risks && riskAnalysis.detected_risks.length > 0 && (
+              {((riskAnalysis.detected_risks && riskAnalysis.detected_risks.length > 0) || (riskAnalysis.failed_checks && riskAnalysis.failed_checks.length > 0)) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-destructive flex items-center gap-2">
-                    <ShieldAlert className="h-4 w-4" /> Failed Checks ({riskAnalysis.detected_risks.length})
+                    <ShieldAlert className="h-4 w-4" /> Failed Checks ({(riskAnalysis.detected_risks || riskAnalysis.failed_checks || []).length})
                   </h4>
                   <div className="bg-destructive/5 border border-destructive/20 rounded-lg divide-y divide-destructive/10">
-                    {riskAnalysis.detected_risks.map((risk, i) => (
+                    {(riskAnalysis.detected_risks || riskAnalysis.failed_checks || []).map((risk: string, i: number) => (
                       <div key={i} className="p-3 flex items-start gap-3 text-sm">
                         <XCircle className="h-5 w-5 text-destructive shrink-0" />
                         <span className="text-destructive/90">{sanitizeString(risk)}</span>

@@ -90,4 +90,20 @@ class EmailService:
         html_content = EmailTemplateBuilder.build_password_changed_email(recipient_name)
         await self.send_email(to_email, subject, html_content)
 
+    async def send_unknown_device_email(self, to_email: str, recipient_name: str, device_name: str, ip_address: str, location: str = "Unknown") -> None:
+        """
+        Sends an alert when a new device logs into the account.
+        """
+        subject = "🛡️ CyberShield AI: New Device Login Detected"
+        html_content = EmailTemplateBuilder.build_unknown_device_email(recipient_name, device_name, ip_address, location)
+        await self.send_email(to_email, subject, html_content)
+
+    async def send_google_account_linked_email(self, to_email: str, recipient_name: str) -> None:
+        """
+        Sends a confirmation when a Google account is successfully linked.
+        """
+        subject = "🛡️ CyberShield AI: Google Account Linked"
+        html_content = EmailTemplateBuilder.build_google_account_linked_email(recipient_name)
+        await self.send_email(to_email, subject, html_content)
+
 email_service = EmailService()

@@ -19,3 +19,5 @@ backend/app/__pycache__/
 
 # OS files
 .DS_Store
+venv/
+*.db

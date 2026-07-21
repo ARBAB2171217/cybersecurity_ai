@@ -23,7 +23,6 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
   const { login } = useAuth();
   const [step, setStep] = useState<"FORM" | "OTP">("FORM");
   const [email, setEmail] = useState("");
-  const [pendingTokens, setPendingTokens] = useState<TokenPair | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,9 +41,8 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
     setError(null);
     try {
       const response = await authService.register(data);
-      if (response.success && response.data) {
+      if (response.success) {
         setEmail(data.email);
-        setPendingTokens(response.data);
         setStep("OTP");
       } else {
         setError(response.message || "Registration failed.");
@@ -61,21 +59,9 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
   };
 
   const handleOTPSuccess = async () => {
-    if (pendingTokens) {
-      try {
-        await login(pendingTokens.access_token, pendingTokens.refresh_token);
-        onClose();
-        
-        const updatedUser = useAuthStore.getState().user;
-        const userRole = resolveRole(updatedUser);
-        window.location.href = getDefaultRedirect(userRole);
-      } catch (err: any) {
-         setError("Login failed after verification. Please try logging in manually.");
-         setStep("FORM");
-      }
-    } else {
-       onSwitchToLogin();
-    }
+    // Registration complete, OTP verified. 
+    // Now switch to login so they can log in normally.
+    onSwitchToLogin();
   };
 
   return (

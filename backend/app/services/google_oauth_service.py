@@ -7,6 +7,7 @@ from app.repositories.refresh_repository import RefreshRepository
 from app.services.jwt_service import jwt_service
 from app.services.session_manager import SessionManager
 from app.schemas.auth import TokenResponse
+from app.services.audit_service import AuditService
 
 class GoogleOAuthService:
     """
@@ -17,11 +18,13 @@ class GoogleOAuthService:
         self,
         user_repo: UserRepository,
         refresh_repo: RefreshRepository,
-        session_manager: SessionManager
+        session_manager: SessionManager,
+        audit_service: AuditService
     ):
         self.user_repo = user_repo
         self.refresh_repo = refresh_repo
         self.session_manager = session_manager
+        self.audit_service = audit_service
 
     async def authenticate_google(
         self,
@@ -69,7 +72,9 @@ class GoogleOAuthService:
                 "google_id": google_id,
                 "avatar": avatar,
                 "provider": "google",
-                "email_verified": email_verified
+                "email_verified": email_verified,
+                "last_login": datetime.datetime.now(datetime.timezone.utc),
+                "last_device": user_agent
             }
             user = await self.user_repo.create(user_data)
         else:
@@ -86,9 +91,31 @@ class GoogleOAuthService:
             if not user.is_verified:
                 updates["is_verified"] = True
                 
+            updates["last_login"] = datetime.datetime.now(datetime.timezone.utc)
+            updates["last_device"] = user_agent
+            
             if updates:
                 await self.user_repo.update(user, updates)
                 
+                # Send Google linked email if provider changed
+                if "provider" in updates and updates["provider"] == "google":
+                    from app.services.email_service import email_service
+                    await email_service.send_google_account_linked_email(user.email, user.full_name)
+
+        # Device Recognition & Security Notifications
+        is_new_device = user.last_device is not None and user.last_device != user_agent
+        if is_new_device:
+            from app.services.email_service import email_service
+            await email_service.send_unknown_device_email(user.email, user.full_name, str(user_agent), str(ip_address))
+            
+            # Require OTP for unknown devices
+            from app.services.otp_service import otp_service
+            from app.models.otp import OTPPurpose
+            await otp_service.create_and_send_otp(user.email, OTPPurpose.LOGIN)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Login from a new device detected. A verification code has been sent to your email."
+            )
         # Generate new JWT pair
         token_pair = jwt_service.generate_token_pair(str(user.id), "USER")
         
@@ -106,6 +133,14 @@ class GoogleOAuthService:
             user_id=user.id,
             ip_address=ip_address,
             user_agent=user_agent
+        )
+        
+        # Log action
+        await self.audit_service.log_action(
+            action="GOOGLE_LOGIN",
+            user_id=user.id,
+            ip_address=ip_address,
+            details={"email": email, "user_agent": user_agent, "is_new_device": is_new_device}
         )
         
         return token_pair

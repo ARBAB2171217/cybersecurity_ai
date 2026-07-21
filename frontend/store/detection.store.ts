@@ -44,7 +44,19 @@ export const useDetectionStore = create<DetectionState & DetectionActions>()(
         if (res.success && res.data) {
           set({ result: res.data, status: "success", progress: 100 });
           // Return the reportId so the caller can navigate to the result page
-          return res.data.id;
+          const reportId = res.data.report_id ?? res.data.id;
+          
+          if (!reportId) {
+              console.error(
+                  "[Universal Scanner] Backend returned no report identifier.",
+                  res.data
+              );
+              throw new Error(
+                  "Universal Scanner completed but no report identifier was returned."
+              );
+          }
+          
+          return reportId;
         } else {
           throw new Error(res.message || "Detection pipeline returned an error.");
         }

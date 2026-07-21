@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/auth.service";
 import { Button } from "../ui/button";
 import { GoogleLoginButton } from "./GoogleLoginButton";
+import { OtpInput } from "./OtpInput";
 import { AuthLayout } from "./AuthLayout";
 import { X } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
@@ -28,6 +29,9 @@ export function LoginModal({
   onSwitchToForgotPassword,
 }: LoginModalProps) {
   const { login } = useAuth();
+  const [step, setStep] = useState<"FORM" | "OTP">("FORM");
+  const [emailForOtp, setEmailForOtp] = useState("");
+  const [otpPurpose, setOtpPurpose] = useState<"LOGIN" | "REGISTRATION">("LOGIN");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
@@ -79,12 +83,27 @@ export function LoginModal({
     } catch (err: any) {
       if (err?.response?.status === 429) {
         setError("Too many attempts. Please try again in 2 minutes.");
+      } else if (err?.response?.status === 403 && (err.response.data?.detail?.includes("verified") || err.response.data?.detail?.includes("device"))) {
+        // Handle unverified email or unknown device requiring OTP
+        setEmailForOtp(data.email);
+        setOtpPurpose(err.response.data.detail.includes("device") ? "LOGIN" : "REGISTRATION");
+        setStep("OTP");
       } else {
         setError(err?.response?.data?.message || err.message || "Failed to authenticate.");
       }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleOTPSuccess = async (code?: string) => {
+    // For LOGIN purpose, the OTP verify doesn't return the token in this app's flow unless we change it.
+    // Actually, verifyOTP just returns success. If we just re-submit the login form, it should work now
+    // because the backend can mark the device as trusted or the email as verified.
+    // Wait, if it's LOGIN purpose, we might need to resubmit the form.
+    setIsLoading(true);
+    setStep("FORM");
+    handleSubmit(onSubmit)();
   };
 
   const handleGoogleSuccess = async (credential: string) => {
@@ -105,6 +124,13 @@ export function LoginModal({
     } catch (err: any) {
       if (err?.response?.status === 429) {
         setError("Too many attempts. Please try again in 2 minutes.");
+      } else if (err?.response?.status === 403 && (err.response.data?.detail?.includes("verified") || err.response.data?.detail?.includes("device"))) {
+        // We need the email for OTP. For Google Auth, if it's a new device, we might not have it in the form.
+        // We will just extract it from the Google SDK token if possible, or we could return it from the backend.
+        // But since we can't easily extract it without parsing JWT, we will let the user know they need to login manually.
+        // Actually, if we require OTP for Google, it's better to just show the OTP form if we have the email.
+        // Let's just ask them to verify via email link or show an error.
+        setError(err.response.data.detail);
       } else {
         setError(err?.response?.data?.detail || err?.response?.data?.message || err.message || "Failed to authenticate via Google.");
       }
@@ -128,11 +154,17 @@ export function LoginModal({
         </button>
 
         <div className="mb-8 text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Welcome back</h2>
-          <p className="text-sm text-muted-foreground mt-2">Log in to your account</p>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
+            {step === "FORM" ? "Welcome back" : "Security Verification"}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-2">
+            {step === "FORM" ? "Log in to your account" : "Please enter the verification code sent to your email"}
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {step === "FORM" ? (
+          <>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {error && (
             <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive text-center font-medium">
               {error}
@@ -215,6 +247,16 @@ export function LoginModal({
             Create account
           </button>
         </div>
+          </>
+        ) : (
+          <OtpInput
+            email={emailForOtp}
+            purpose={otpPurpose}
+            onSuccess={handleOTPSuccess}
+            onCancel={() => setStep("FORM")}
+            mode="auto-verify"
+          />
+        )}
       </div>
     </div>
   );

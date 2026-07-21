@@ -89,19 +89,12 @@ export function EvidenceUploader() {
   };
 
   return (
-    <Card className="border-primary/20 relative overflow-hidden bg-zinc-950/60 backdrop-blur-md shadow-2xl">
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 via-primary to-indigo-500" />
-      <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-      <CardHeader className="flex flex-row items-center gap-3 pb-4">
-        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20 shadow-inner">
-          <Sparkles className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <CardTitle className="text-xl tracking-tight">AI Smart Evidence Analysis</CardTitle>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Upload images, scan QR codes, or paste links for instant threat detection.</p>
-        </div>
-      </CardHeader>
+    <Card className="border-none shadow-none relative overflow-hidden bg-transparent">
+      <div className="flex flex-col items-center text-center pb-4 pt-6">
+        <Upload className="h-10 w-10 text-muted-foreground mb-3 opacity-60" />
+        <CardTitle className="text-sm font-bold">Drag & Drop Analysis Hub</CardTitle>
+        <p className="text-[11px] text-muted-foreground mt-0.5">Select file to view and to analyze</p>
+      </div>
 
       <CardContent>
         {/* Tabs */}

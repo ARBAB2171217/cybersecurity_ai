@@ -28,8 +28,8 @@ export const authService = {
   /**
    * Registers a new citizen. Returns JWT token pair on success.
    */
-  async register(data: RegisterInput): Promise<ApiResponse<TokenPair>> {
-    const res = await api.post<ApiResponse<TokenPair>>("/auth/register", data);
+  async register(data: RegisterInput): Promise<ApiResponse<null>> {
+    const res = await api.post<ApiResponse<null>>("/auth/register", data);
     return res.data;
   },
 
