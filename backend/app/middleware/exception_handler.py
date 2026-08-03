@@ -92,7 +92,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     
     response_content = StandardResponse(
         success=False,
-        message=f"DEBUG ERROR: {exc.__class__.__name__} - {str(exc)}",
+        message="An unexpected system error occurred. Our engineers have been notified.",
         data=None
     ).model_dump()
     
