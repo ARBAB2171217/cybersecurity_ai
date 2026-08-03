@@ -264,10 +264,15 @@ def detect_fraud_indicators(text: str) -> Dict[str, bool]:
         "payment_receipt": any(k in text_lower for k in ["paid successfully", "txn status: success", "transaction successful"]),
         "transaction_success": "success" in text_lower or "successful" in text_lower,
         "login_screen": any(k in text_lower for k in ["username", "password", "sign in", "login"]),
-        "kyc_request": any(k in text_lower for k in ["kyc", "verify identity", "pan card", "aadhaar verification"]),
-        "reward_message": any(k in text_lower for k in ["scratch card", "reward won", "cashback", "lucky winner"]),
-        "investment_message": any(k in text_lower for k in ["investment", "double returns", "daily profit", "crypto bonus"]),
-        "bank_notification": any(k in text_lower for k in ["debited by", "credited with", "account balance"])
+        "kyc_request": any(k in text_lower for k in ["kyc", "verify identity", "pan card", "aadhaar verification", "kyc expired"]),
+        "reward_message": any(k in text_lower for k in ["scratch card", "reward won", "cashback", "lucky winner", "congratulations"]),
+        "investment_message": any(k in text_lower for k in ["investment", "double returns", "daily profit", "crypto bonus", "guaranteed return"]),
+        "bank_notification": any(k in text_lower for k in ["debited by", "credited with", "account balance"]),
+        "urgency": any(k in text_lower for k in ["immediate action", "verify now", "account blocked", "kyc expired", "last warning", "click here", "update now", "limited time", "urgent", "immediately"]),
+        "payment_request": any(k in text_lower for k in ["registration fee", "security deposit", "processing fee", "advance payment", "booking amount", "pay fee to unlock"]),
+        "credential_request": any(k in text_lower for k in ["otp request", "password", "pin", "cvv", "aadhaar number", "pan number", "card details"]),
+        "scam_language": any(k in text_lower for k in ["congratulations", "lucky winner", "guaranteed return", "instant approval", "double money", "easy income", "work from home", "government approved"]),
+        "social_engineering": any(k in text_lower for k in ["police", "arrest", "fir", "blocked", "suspended", "legal action", "cyber crime", "warrant"])
     }
 
 def map_relationships(financials: Dict[str, Any], contacts: Dict[str, Any], web: Dict[str, Any], payment: Dict[str, Any]) -> List[Dict[str, Any]]:

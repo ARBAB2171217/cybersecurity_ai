@@ -12,7 +12,6 @@ from app.validators.report_validator import validate_report_payload
 from app.services.report_service import ReportService
 from app.services.upload_service import upload_service
 from app.services.ai_detection_service import AIDetectionService
-from app.services.image_processing_service import ImageProcessingService
 from pydantic import BaseModel
 from app.schemas.response import StandardResponse
 from app.schemas.report import ReportResponse
@@ -121,13 +120,6 @@ async def resolve_url_redirects(
 class URLAnalyzeRequest(BaseModel):
     originalUrl: str
     finalUrl: str
-    category: str
-    ipType: str
-    riskScore: int
-    threatLevel: str
-    triggeredRules: list[dict]
-    brandMatch: dict
-    redirectChain: Optional[dict] = None
 
 
 class URLAnalyzeResponse(BaseModel):

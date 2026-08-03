@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr-hin \
     libgl1 \
     libglib2.0-0 \
+    libzbar0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy wheels and install
@@ -51,5 +52,5 @@ ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Command to run (using Uvicorn for ASGI)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Command to run (using Uvicorn for ASGI with automatic migrations)
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

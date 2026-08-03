@@ -137,6 +137,61 @@ class ScreenshotRiskAnalyzer:
                     "description": f"Screenshot displays large financial amount: ₹{max(large_amounts):,}. High-value screens are frequently fabricated to showcase fake investments or winnings."
                 })
 
+        # Rule 9: Urgency Language (High Risk)
+        if indicators.get("urgency"):
+            penalty = 25
+            total_penalty += penalty
+            triggered_rules.append({
+                "name": "Urgency / Threat Language",
+                "status": "Fail",
+                "severity": "High",
+                "description": "Detected high-pressure language (e.g. 'immediate action', 'blocked'). Scammers use artificial urgency to force victims into making quick, irrational decisions."
+            })
+
+        # Rule 10: Advance Payment Request (High Risk)
+        if indicators.get("payment_request"):
+            penalty = 30
+            total_penalty += penalty
+            triggered_rules.append({
+                "name": "Advance Fee Request",
+                "status": "Fail",
+                "severity": "High",
+                "description": "Detected requests for registration fee, processing fee, or security deposit. Advance-fee scams require upfront payment for a promised service/job that never materializes."
+            })
+
+        # Rule 11: Credential Theft (Critical Risk)
+        if indicators.get("credential_request"):
+            penalty = 40
+            total_penalty += penalty
+            triggered_rules.append({
+                "name": "Credential Theft Request",
+                "status": "Fail",
+                "severity": "Critical",
+                "description": "Detected requests for sensitive credentials (PIN, CVV, Aadhaar, PAN). Legitimate organizations never ask for these details via chat or SMS."
+            })
+
+        # Rule 12: Scam Language (High Risk)
+        if indicators.get("scam_language"):
+            penalty = 25
+            total_penalty += penalty
+            triggered_rules.append({
+                "name": "Typical Scam Language",
+                "status": "Warning",
+                "severity": "High",
+                "description": "Detected common scam phrasing ('guaranteed return', 'lucky winner'). These are highly correlated with employment and lottery fraud."
+            })
+
+        # Rule 13: Social Engineering / Impersonation (High Risk)
+        if indicators.get("social_engineering"):
+            penalty = 35
+            total_penalty += penalty
+            triggered_rules.append({
+                "name": "Authority Impersonation",
+                "status": "Fail",
+                "severity": "High",
+                "description": "Detected threats of legal action, arrest, or police impersonation. Scammers use fear and fake authority to coerce victims into compliance."
+            })
+
         # Calculate final risk score (0-100)
         risk_score = min(max(total_penalty, 0), 100)
 

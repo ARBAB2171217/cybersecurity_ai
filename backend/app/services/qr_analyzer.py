@@ -250,8 +250,72 @@ class QRAnalyzerService:
             except Exception as e:
                 errors.append(f"Failed to parse Location format: {e}")
 
+        elif qr_type == "WhatsApp":
+            try:
+                # wa.me/1234567890?text=Hello or api.whatsapp.com/send?phone=...
+                phone = None
+                text = None
+                is_group = False
+                
+                if "chat.whatsapp.com" in decoded_value:
+                    is_group = True
+                    group_id = decoded_value.split("chat.whatsapp.com/")[-1]
+                    extracted = {
+                        "Is Group Invite": True,
+                        "Group ID": group_id
+                    }
+                else:
+                    parsed = urllib.parse.urlparse(decoded_value if "://" in decoded_value else "https://" + decoded_value)
+                    query_params = urllib.parse.parse_qs(parsed.query)
+                    
+                    if "wa.me/" in decoded_value:
+                        path_parts = parsed.path.strip("/").split("/")
+                        if path_parts:
+                            phone = path_parts[0]
+                    else:
+                        phone = query_params.get("phone", [None])[0]
+                        
+                    text = query_params.get("text", [None])[0]
+                    
+                    extracted = {
+                        "Is Group Invite": False,
+                        "Phone Number": phone,
+                        "Pre-filled Text": text
+                    }
+            except Exception as e:
+                errors.append(f"Failed to parse WhatsApp format: {e}")
+
+        elif qr_type == "Cryptocurrency Address":
+            try:
+                # bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa?amount=0.01
+                currency = "Unknown"
+                address = decoded_value
+                amount = None
+                
+                if ":" in decoded_value:
+                    scheme, rest = decoded_value.split(":", 1)
+                    currency = scheme.capitalize()
+                    
+                    if "?" in rest:
+                        address, query = rest.split("?", 1)
+                        query_params = urllib.parse.parse_qs(query)
+                        amount = query_params.get("amount", [None])[0]
+                    else:
+                        address = rest
+                        
+                extracted = {
+                    "Cryptocurrency": currency,
+                    "Wallet Address": address,
+                    "Requested Amount": amount
+                }
+                
+                if not address:
+                    errors.append("Invalid cryptocurrency address format")
+            except Exception as e:
+                errors.append(f"Failed to parse Crypto format: {e}")
+
         else:
-            # Plain Text, Unknown, Cryptocurrency, etc.
+            # Plain Text, Unknown, Application Download, Social Media etc.
             extracted = {
                 "Text": decoded_value
             }

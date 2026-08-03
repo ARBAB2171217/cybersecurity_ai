@@ -14,7 +14,7 @@ def add_cors_headers(request: Request, response: JSONResponse) -> JSONResponse:
         origins = settings.CORS_ORIGINS
         if isinstance(origins, str):
             origins = [o.strip() for o in origins.split(",") if o.strip()]
-        if "*" in origins or origin in origins or "http://localhost:3000" in origins:
+        if "*" in origins or origin in origins:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "*"

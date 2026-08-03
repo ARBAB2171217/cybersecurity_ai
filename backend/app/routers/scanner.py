@@ -123,6 +123,9 @@ async def universal_scan(
         serial_number=classification.get("detected_serial"),
         image_url=analysis_url
     )
+    
+    # Safely extract report_id while the session is fresh
+    report_id_str = str(report.id) if report and hasattr(report, "id") else None
 
     # Persist deterministic routing metadata.
     try:
@@ -188,8 +191,9 @@ async def universal_scan(
         classification=classification,
         router_output=router_output
     )
-    if report and hasattr(report, "id"):
-        unified_response["report_id"] = str(report.id)
+    if report_id_str:
+        unified_response["report_id"] = report_id_str
+        unified_response["id"] = report_id_str  # Add "id" for backward compatibility with frontend
 
     return StandardResponse(
         success=True,

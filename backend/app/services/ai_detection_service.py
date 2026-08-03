@@ -6,14 +6,11 @@ from fastapi import HTTPException, status
 from app.repositories.report_repository import ReportRepository
 from app.models.report import Report, ReportStatus
 from app.ai.pipelines.detection_pipeline import run_detection_pipeline
-from app.services.image_processing_service import ImageProcessingService
 import hashlib
 import json
 from app.services.redis_service import redis_service
 
 logger = logging.getLogger("app.services.ai_detection_service")
-
-_image_service = ImageProcessingService()
 
 
 class AIDetectionService:
@@ -135,82 +132,7 @@ class AIDetectionService:
         finally:
             # Always remove the uploaded image from disk — success OR failure.
             # Preprocessed intermediate files are removed inside detection_pipeline.py.
-            _image_service.delete_file(local_path)
-
-    async def analyze_generic_evidence(self, report_id: uuid.UUID) -> Report:
-        """
-        Analyzes QR code evidence or screenshot/document visual evidence.
-        """
-        report = await self.report_repo.get_by_id(report_id)
-        if not report or report.deleted_at is not None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Scan report not found.",
-            )
-
-        filename = os.path.basename(report.image_url)
-        local_path = os.path.abspath(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../media/uploads",
-                filename,
-            )
-        )
-
-        try:
-            if report.selected_pipeline == "QR Intelligence":
-                try:
-                    from app.intelligence.qr.qr_pipeline import QRIntelligencePipeline
-                    pipeline = QRIntelligencePipeline()
-                    analysis_result = await pipeline.execute(local_path)
-                except ImportError:
-                    logger.error("QR Intelligence module is not installed or missing dependencies.")
-                    analysis_result = {
-                        "risk_analysis": {"risk_level": "Unknown"},
-                        "confidence": 0.0,
-                        "timeline": {},
-                        "status": "NEEDS_MANUAL_VERIFICATION",
-                        "error": "QR Intelligence module disabled."
-                    }
-                
-                risk_analysis = analysis_result.get("risk_analysis", {})
-                risk_level = risk_analysis.get("risk_level", "Unknown")
-                
-                if risk_level in ["Safe", "Low"]:
-                    report.is_counterfeit = False
-                    report.status = ReportStatus.APPROVED.value
-                elif risk_level == "Medium":
-                    report.is_counterfeit = None
-                    report.status = ReportStatus.PENDING.value
-                else:
-                    report.is_counterfeit = True
-                    report.status = ReportStatus.REJECTED.value
-                    
-                report.confidence_score = float(analysis_result.get("confidence", 1.0))
-                
-                if "timeline" not in analysis_result:
-                    analysis_result["timeline"] = {
-                        "QR Detection": 120.0,
-                        "Type Classification": 70.0,
-                        "Security Evaluation": 110.0,
-                        "AI Summary": 180.0
-                    }
-                
-                # Wrap it under qr_details so the frontend can parse it easily
-                report.raw_ai_response = {"qr_details": analysis_result}
-                
-            else:
-                # Run Screenshot Intelligence using the EvidenceIntelligenceEngine
-                from app.services.evidence_engine import EvidenceIntelligenceEngine, ReportMapper
-                
-                analysis_result = await EvidenceIntelligenceEngine.analyze_screenshot(local_path, filename)
-                report = ReportMapper.map_to_report(report, analysis_result)
-
-            await self.report_repo.db.commit()
-            await self.report_repo.db.refresh(report)
-        finally:
-            if os.path.exists(local_path):
-                _image_service.delete_file(local_path)
-                logger.info(f"Cleaned up evidence file: {local_path}")
-
-        return report
+            try:
+                os.remove(local_path)
+            except OSError:
+                pass

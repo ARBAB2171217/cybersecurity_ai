@@ -255,6 +255,53 @@ class QRRiskAnalyzerService:
                 risk_score += 10
             else:
                 passed_checks.append("Visible SSID")
+                
+        elif qr_type == "WhatsApp":
+            is_group = extracted_info.get("Is Group Invite", False)
+            phone = extracted_info.get("Phone Number", "")
+            
+            # 1. Public Group Risk
+            if is_group:
+                failed_checks.append("Public Group Invite")
+                risk_score += 25
+            else:
+                passed_checks.append("Direct Message")
+                
+            # 2. International premium numbers
+            if phone and not phone.startswith(("91", "+91", "1", "+1")):
+                failed_checks.append("International number")
+                risk_score += 15
+                
+        elif qr_type == "Cryptocurrency Address":
+            address = extracted_info.get("Wallet Address", "")
+            
+            # Cryptocurrency transactions are irreversible. Inherently risky for QR scans.
+            failed_checks.append("Irreversible transaction vector")
+            risk_score += 30
+            
+            if not address:
+                failed_checks.append("Malformed crypto address")
+                risk_score += 20
+                
+        elif qr_type == "Contact Card":
+            website = extracted_info.get("Website", "")
+            
+            if website and ("http://" in website.lower() or ".xyz" in website.lower()):
+                failed_checks.append("Suspicious website in vCard")
+                risk_score += 20
+            else:
+                passed_checks.append("No suspicious websites in contact")
+                
+        elif qr_type == "Unknown" or qr_type == "Plain Text":
+            # 1. Unrecognized payload format
+            failed_checks.append("Unrecognized payload format")
+            risk_score += 30
+            
+            # 2. Hidden terminal execution commands
+            dangerous_cmds = ["curl ", "wget ", "bash ", "sh ", "powershell", "cmd.exe", "eval("]
+            if any(cmd in decoded_value.lower() for cmd in dangerous_cmds):
+                failed_checks.append("Terminal execution payload detected")
+                risk_score += 50
         
         detected_risks = list(set(detected_risks + failed_checks))
         
@@ -354,11 +401,30 @@ class QRRiskAnalyzerService:
             else:
                 prevention_tips = ["Verify the SSID belongs to the establishment before connecting."]
                 final_recommendation = "Secure WPA/WPA2 Wi-Fi configuration."
+        elif qr_type == "WhatsApp":
+            if is_unsafe:
+                fraud_scenario = "Public WhatsApp group invites can lead to social engineering, spam, and exposure of your phone number to malicious actors."
+                prevention_tips = ["Do not join unknown groups.", "Verify the group's legitimacy before interacting."]
+                final_recommendation = "DO NOT JOIN. The invite may expose your contact info to scammers."
+            else:
+                prevention_tips = ["Verify the recipient before sending messages."]
+                final_recommendation = "Standard WhatsApp interaction. Proceed safely."
+        elif qr_type == "Cryptocurrency Address":
+            if is_unsafe:
+                fraud_scenario = "Crypto transactions are irreversible. Scammers use QR codes to replace recipient addresses."
+                prevention_tips = ["Always manually verify the first and last 4 characters of the wallet address.", "Do not trust QR codes for large transfers."]
+                final_recommendation = "HIGH RISK. Cryptocurrency payments cannot be reversed. Verify address carefully."
+            else:
+                prevention_tips = ["Verify address before sending."]
+                final_recommendation = "Standard Crypto Address."
         else:
             if is_unsafe:
                 fraud_scenario = "QR codes containing unformatted text can hide exploit payloads, malicious terminal commands, or redirect strings."
                 prevention_tips = ["Do not copy-paste or execute scripts found inside untrusted QR scans."]
-                final_recommendation = "DO NOT EXECUTE or copy the payload. Content structure is unrecognized."
+                final_recommendation = "DO NOT EXECUTE or copy the payload. Content structure is unrecognized or dangerous."
+            else:
+                prevention_tips = ["Be cautious with unknown text."]
+                final_recommendation = "Standard text detected."
 
         return {
             "qr_type": qr_type,

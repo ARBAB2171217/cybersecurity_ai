@@ -33,6 +33,27 @@ class QRIntelligencePipeline(IntelligencePipeline):
                 "cached_preproc": True
             }
             
+        from app.ai.pipelines.preprocessing import assess_image_quality
+        try:
+            # Step 1: Image Quality Assessment
+            quality = assess_image_quality(image_path)
+            if quality.get("quality_status") == "REJECTED":
+                return {
+                    "image_path": image_path,
+                    "early_exit": True,
+                    "error": "LOW_IMAGE_QUALITY",
+                    "reason": ", ".join(quality.get("detected_issues", [])),
+                    "recommendation": quality.get("recommendation", "Capture a better image.")
+                }
+        except ValueError as e:
+            return {
+                "image_path": image_path,
+                "early_exit": True,
+                "error": "LOW_IMAGE_QUALITY",
+                "reason": str(e),
+                "recommendation": "Capture a clearer image without blur or shadows."
+            }
+            
         image = cv2.imread(image_path)
         if image is None:
             return None
@@ -50,6 +71,8 @@ class QRIntelligencePipeline(IntelligencePipeline):
 
     async def parse(self, processed_data: Dict[str, Any]) -> Dict[str, Any]:
         """Decode all QR codes in the image using multiple fallback strategies for damaged/distorted QRs."""
+        if processed_data.get("early_exit"): return processed_data
+        
         if processed_data.get("cached_preproc") and self.classification:
             qr_details = self.classification.get("qr_details", {})
             decoded_values = qr_details.get("decoded_values", [])
@@ -133,6 +156,8 @@ class QRIntelligencePipeline(IntelligencePipeline):
 
     async def extract_entities(self, parsed_data: Dict[str, Any]) -> Dict[str, Any]:
         """Identify QR types (UPI, URL, Contact, etc)."""
+        if parsed_data.get("early_exit"): return {"qr_count": 0, "primary_type": "Unknown", "qrs": [], "early_exit": True, "reason": parsed_data.get("reason"), "recommendation": parsed_data.get("recommendation")}
+        
         from app.services.qr_type_classifier import QRTypeClassifier
         
         qrs = parsed_data.get("decoded_qrs", [])
@@ -165,6 +190,8 @@ class QRIntelligencePipeline(IntelligencePipeline):
 
     async def run_rules(self, parsed_data: Dict[str, Any], entities: Dict[str, Any]) -> Dict[str, Any]:
         """Deterministic risk analysis."""
+        if entities.get("early_exit"): return {}
+        
         from app.services.qr_risk_analyzer import QRRiskAnalyzerService
         
         failed_checks = []
@@ -255,6 +282,30 @@ class QRIntelligencePipeline(IntelligencePipeline):
         return round(max(0.1, min(1.0, (passed + 0.5 * warning) / total)), 2)
 
     async def format_decision(self, parsed_data: Dict[str, Any], confidence: float, ai_reasoning: Dict[str, Any], rule_results: Dict[str, Any]) -> Dict[str, Any]:
+        if parsed_data.get("early_exit"):
+            return {
+                "qr_detected": False,
+                "qr_count": 0,
+                "qr_type": "Unknown",
+                "decoded_value": None,
+                "extracted_information": {},
+                "confidence": 0.0,
+                "risk_analysis": {
+                    "risk_score": 0,
+                    "risk_level": "Unknown",
+                    "passed_checks": [],
+                    "warning_checks": [],
+                    "failed_checks": [parsed_data.get("reason")],
+                    "ai_summary": parsed_data.get("error", "LOW_IMAGE_QUALITY"),
+                    "prevention_guidance": parsed_data.get("recommendation", "Try again with a clearer image.")
+                },
+                "status": "REJECTED",
+                "threat_level": "Unknown",
+                "summary": parsed_data.get("error", "Image quality rejected."),
+                "recommendation": parsed_data.get("recommendation", ""),
+                "url_intelligence": {}
+            }
+            
         qrs = self.context["evidence"]["entities"].get("qrs", [])
         primary_data = qrs[0]["data"] if qrs else ""
         primary_type = qrs[0]["type"] if qrs else "Unknown"

@@ -28,7 +28,7 @@ class GeminiClient:
             return
 
         genai.configure(api_key=key)
-        cls._model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        cls._model = genai.GenerativeModel(model_name="gemini-3.5-flash")
         cls._is_initialized = True
 
     @classmethod
