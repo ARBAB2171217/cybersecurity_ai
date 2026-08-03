@@ -27,6 +27,11 @@ export default function Error({ error, reset }: ErrorProps) {
       <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
         An isolated runtime error occurred in the browser process. Safe state telemetry logs have been updated.
       </p>
+
+      <div className="mt-4 p-4 bg-zinc-950 border border-red-500 rounded text-left max-w-2xl overflow-auto text-xs font-mono text-red-400">
+        <p><b>Error:</b> {error.message}</p>
+        {error.stack && <pre className="mt-2">{error.stack}</pre>}
+      </div>
       
       <button
         onClick={reset}

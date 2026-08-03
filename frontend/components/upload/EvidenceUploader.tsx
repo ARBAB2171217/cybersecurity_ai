@@ -137,17 +137,17 @@ export function EvidenceUploader() {
             <div className="flex flex-col gap-2 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
               <div className="flex items-center gap-2 font-bold text-sm">
                 <CheckCircle className="h-5 w-5 shrink-0" />
-                <span>Evidence Detected: {result.evidenceType || "Unknown"}</span>
+                <span>Evidence Detected: {result.evidenceType || (result as any).classification?.detected_type || "Unknown"}</span>
               </div>
               <div className="text-xs ml-7 space-y-1">
-                {result.rawAiResponse?.qr_details ? (
+                {result.rawAiResponse?.qr_details || (result as any).classification?.subtype === "URL" || (result as any).classification?.detected_type === "QR Code" ? (
                   <>
-                    <p>QR Type: <span className="font-semibold text-emerald-300">{result.rawAiResponse.qr_details.qr_type}</span></p>
-                    <p>Decoded Content: <span className="font-semibold text-emerald-300 truncate inline-block max-w-[200px] align-bottom">{result.rawAiResponse.qr_details.decoded_value}</span></p>
-                    <p>Confidence: <span className="font-semibold text-emerald-300">{(result.rawAiResponse.qr_details.confidence * 100).toFixed(0)}%</span></p>
+                    <p>QR Type: <span className="font-semibold text-emerald-300">{result.rawAiResponse?.qr_details?.qr_type || (result as any).classification?.subtype}</span></p>
+                    <p>Decoded Content: <span className="font-semibold text-emerald-300 truncate inline-block max-w-[200px] align-bottom">{result.rawAiResponse?.qr_details?.decoded_value || "Processing..."}</span></p>
+                    <p>Confidence: <span className="font-semibold text-emerald-300">{(result.rawAiResponse?.qr_details?.confidence ?? ((result as any).classification?.confidence || 0)) * 100}%</span></p>
                   </>
                 ) : (
-                  <p>Selected Analysis: <span className="font-semibold text-emerald-300">{result.selectedPipeline || "Generic Analysis"}</span></p>
+                  <p>Selected Analysis: <span className="font-semibold text-emerald-300">{result.selectedPipeline || (result as any).classification?.pipeline || "Generic Analysis"}</span></p>
                 )}
                 <p className="animate-pulse mt-2 text-emerald-500/80">Automatically continuing to results...</p>
               </div>

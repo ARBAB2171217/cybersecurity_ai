@@ -63,7 +63,7 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
   const qrDetails = useMemo(() => {
     if (!report.rawAiResponse) return undefined;
     if (report.rawAiResponse.qr_details) return report.rawAiResponse.qr_details;
-    if (report.rawAiResponse.qr_detected !== undefined) return report.rawAiResponse;
+    if ((report.rawAiResponse as any).qr_detected !== undefined) return report.rawAiResponse as any;
     return undefined;
   }, [report.rawAiResponse]);
   
@@ -73,7 +73,7 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
 
   // Helper to determine threat colors (Memoized static mapping)
   const getThreatLevelColor = useCallback((level: string) => {
-    switch (level?.toLowerCase()) {
+    switch ((level || '').toLowerCase()) {
       case "safe":
       case "low":
         return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
@@ -88,7 +88,7 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
   }, []);
 
   const getThreatIcon = useCallback((level: string) => {
-    switch (level?.toLowerCase()) {
+    switch ((level || '').toLowerCase()) {
       case "safe":
       case "low":
         return <ShieldCheck className="h-6 w-6 text-emerald-500 animate-pulse" />;
@@ -103,7 +103,7 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
   }, []);
 
   const getTypeIcon = useCallback((type: string) => {
-    const t = type?.toLowerCase() || "";
+    const t = (type || '').toLowerCase();
     if (t.includes("upi")) return <CreditCard className="h-4 w-4 text-primary" />;
     if (t.includes("url") || t.includes("website")) return <LinkIcon className="h-4 w-4 text-primary" />;
     if (t.includes("wifi")) return <Wifi className="h-4 w-4 text-primary" />;
@@ -114,7 +114,7 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
   }, []);
 
   const getActionPreview = useCallback((type: string) => {
-    const t = type?.toLowerCase() || "";
+    const t = (type || '').toLowerCase();
     if (t.includes("upi")) return "Pay to Merchant / Send Money";
     if (t.includes("url") || t.includes("website")) return "Opens Website in Browser";
     if (t.includes("wifi")) return "Connects to Wi-Fi Network";
@@ -168,18 +168,18 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
       {/* 1. Result Header */}
       <div 
         className={`relative overflow-hidden rounded-2xl border p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5 transition-all duration-300 ${
-          threatLevel.toLowerCase() === 'critical' || threatLevel.toLowerCase() === 'high'
+          (threatLevel || '').toLowerCase() === 'critical' || (threatLevel || '').toLowerCase() === 'high'
             ? "bg-destructive/5 border-destructive/30 shadow-lg shadow-destructive/5"
-            : threatLevel.toLowerCase() === 'medium'
+            : (threatLevel || '').toLowerCase() === 'medium'
             ? "bg-amber-500/5 border-amber-500/30 shadow-lg shadow-amber-500/5"
             : "bg-emerald-500/5 border-emerald-500/30 shadow-lg shadow-emerald-500/5"
         }`}
       >
         <div className="flex items-center gap-5">
           <div className={`h-16 w-16 rounded-2xl flex items-center justify-center shrink-0 transition-transform hover:scale-105 ${
-              threatLevel.toLowerCase() === 'critical' || threatLevel.toLowerCase() === 'high'
+              (threatLevel || '').toLowerCase() === 'critical' || (threatLevel || '').toLowerCase() === 'high'
                 ? "bg-destructive/20 text-destructive"
-                : threatLevel.toLowerCase() === 'medium'
+                : (threatLevel || '').toLowerCase() === 'medium'
                 ? "bg-amber-500/20 text-amber-500"
                 : "bg-emerald-500/20 text-emerald-500"
             }`}
@@ -307,7 +307,7 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
                     <ShieldCheck className="h-4 w-4" /> Passed Checks ({riskAnalysis.passed_checks.length})
                   </h4>
                   <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg divide-y divide-emerald-500/10">
-                    {riskAnalysis.passed_checks.map((check, i) => (
+                    {riskAnalysis.passed_checks.map((check: string, i: number) => (
                       <div key={i} className="p-3 flex items-start gap-3 text-sm">
                         <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                         <span className="text-emerald-500/90">{sanitizeString(check)}</span>
@@ -331,7 +331,7 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
               <div className="bg-zinc-900/60 p-4 rounded-lg border border-border/20">
                 <h4 className="text-[11px] font-bold uppercase text-primary mb-1">Threat Summary</h4>
                 <p className="text-sm text-foreground leading-relaxed">
-                  {sanitizeString(riskAnalysis.analysis_summary)}
+                  {sanitizeString(riskAnalysis.analysis_summary || riskAnalysis.ai_summary || "No summary available.")}
                 </p>
               </div>
 
@@ -344,14 +344,18 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
                 </div>
               )}
 
-              {riskAnalysis.prevention_tips && riskAnalysis.prevention_tips.length > 0 && (
+              {((riskAnalysis.prevention_tips && riskAnalysis.prevention_tips.length > 0) || riskAnalysis.prevention_guidance) && (
                 <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
                   <h4 className="text-[11px] font-bold uppercase text-primary mb-2">Prevention Tips</h4>
-                  <ul className="list-disc pl-4 space-y-1.5 text-sm text-foreground/80">
-                    {riskAnalysis.prevention_tips.map((tip, idx) => (
-                      <li key={idx}>{sanitizeString(tip)}</li>
-                    ))}
-                  </ul>
+                  {Array.isArray(riskAnalysis.prevention_tips) ? (
+                    <ul className="list-disc pl-4 space-y-1.5 text-sm text-foreground/80">
+                      {riskAnalysis.prevention_tips.map((tip: string, idx: number) => (
+                        <li key={idx}>{sanitizeString(tip)}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-foreground/80">{sanitizeString(riskAnalysis.prevention_guidance || riskAnalysis.prevention_tips)}</p>
+                  )}
                 </div>
               )}
 
@@ -386,9 +390,9 @@ export function QRResultView({ report, isSavedReport = false }: QRResultViewProp
                     r="40"
                     fill="none"
                     stroke={
-                      threatLevel.toLowerCase() === 'safe' || threatLevel.toLowerCase() === 'low'
+                      (threatLevel || '').toLowerCase() === 'safe' || (threatLevel || '').toLowerCase() === 'low'
                         ? "#10b981" 
-                        : threatLevel.toLowerCase() === 'medium' 
+                        : (threatLevel || '').toLowerCase() === 'medium' 
                         ? "#f59e0b" 
                         : "#ef4444"
                     }

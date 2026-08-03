@@ -45,23 +45,58 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
   const [isRulesExpanded, setIsRulesExpanded] = useState(false);
 
   // Parse raw response
-  const aiResponse = useMemo(() => report.rawAiResponse, [report.rawAiResponse]);
+  const aiResponse = useMemo(() => report.rawAiResponse as any, [report.rawAiResponse]);
   const ocrText = useMemo(() => report.ocrText || aiResponse?.ocr_text || "", [report, aiResponse]);
   const entities = useMemo(() => aiResponse?.entities || {}, [aiResponse]);
-  const riskAnalysis = useMemo(() => aiResponse?.risk_analysis || {}, [aiResponse]);
+  const riskAnalysis = useMemo(() => {
+    if (aiResponse?.risk_analysis) return aiResponse.risk_analysis;
+    if (aiResponse?.triggered_rules && Array.isArray(aiResponse.triggered_rules)) {
+      return {
+        triggered_rules: aiResponse.triggered_rules.map((r: any) => typeof r === 'string' ? { name: r, description: "", severity: "High", score_contribution: 10 } : r)
+      };
+    }
+    return {};
+  }, [aiResponse]);
   const qrIntelligence = useMemo(() => aiResponse?.qr_intelligence || null, [aiResponse]);
-  const urlIntelligence = useMemo(() => aiResponse?.url_intelligence || null, [aiResponse]);
-  const aiAnalysis = useMemo(() => aiResponse?.ai_analysis || {}, [aiResponse]);
-  const timeline = useMemo(() => aiResponse?.timeline || {}, [aiResponse]);
+  const urlIntelligence = useMemo(() => {
+    if (aiResponse?.url_intelligence) return aiResponse.url_intelligence;
+    if (aiResponse?.original_url) {
+      return {
+        detected: true,
+        target_url: aiResponse.final_url || aiResponse.original_url,
+        ai_verdict: {
+          threat_severity: aiResponse.final_threat_level,
+          threat_summary: aiResponse.ai_summary
+        }
+      };
+    }
+    return null;
+  }, [aiResponse]);
+  const aiAnalysis = useMemo(() => {
+    if (aiResponse?.ai_analysis) return aiResponse.ai_analysis;
+    if (aiResponse?.original_url) {
+       return {
+         threat_summary: aiResponse.ai_summary,
+         risk_explanation: `Cyber Threat: ${aiResponse.cyber_threat} | Privacy Risk: ${aiResponse.privacy_risk} | Financial Risk: ${aiResponse.financial_risk}`,
+         prevention_tips: aiResponse.recommendations || []
+       };
+    }
+    return {};
+  }, [aiResponse]);
+  const timeline = useMemo(() => {
+    if (aiResponse?.timeline) return aiResponse.timeline;
+    if (aiResponse?.processing_time) return { "URL Analysis": aiResponse.processing_time };
+    return {};
+  }, [aiResponse]);
 
-  const threatLevel = useMemo(() => aiAnalysis.threat_severity || riskAnalysis.threat_level || "Medium", [aiAnalysis, riskAnalysis]);
-  const riskScore = useMemo(() => riskAnalysis.risk_score ?? 50, [riskAnalysis]);
-  const scamCategory = useMemo(() => aiAnalysis.scam_category || report.category || "Unknown", [aiAnalysis, report]);
-  const confidenceScore = useMemo(() => aiAnalysis.ai_confidence ?? report.confidenceScore ?? 0.8, [aiAnalysis, report]);
-  const recommendation = useMemo(() => aiAnalysis.final_recommendation || "Use Caution", [aiAnalysis]);
+  const threatLevel = useMemo(() => aiAnalysis.threat_severity || riskAnalysis.threat_level || aiResponse?.final_threat_level || "Medium", [aiAnalysis, riskAnalysis, aiResponse]);
+  const riskScore = useMemo(() => riskAnalysis.risk_score ?? aiResponse?.final_risk_score ?? 50, [riskAnalysis, aiResponse]);
+  const scamCategory = useMemo(() => aiAnalysis.scam_category || aiResponse?.website_category || aiResponse?.cyber_threat || report.category || "Unknown", [aiAnalysis, aiResponse, report]);
+  const confidenceScore = useMemo(() => aiAnalysis.ai_confidence ?? aiResponse?.ai_confidence ?? report.confidenceScore ?? 0.8, [aiAnalysis, aiResponse, report]);
+  const recommendation = useMemo(() => aiAnalysis.final_recommendation || (aiResponse?.recommendations && aiResponse.recommendations[0]) || "Use Caution", [aiAnalysis, aiResponse]);
 
   const getThreatColor = useCallback((level: string) => {
-    switch (level?.toLowerCase()) {
+    switch ((level || '').toLowerCase()) {
       case "safe":
       case "low":
         return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
@@ -76,7 +111,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
   }, []);
 
   const getThreatBorderAndBg = useCallback((level: string) => {
-    switch (level?.toLowerCase()) {
+    switch ((level || '').toLowerCase()) {
       case "safe":
       case "low":
         return "bg-emerald-500/5 border-emerald-500/30 shadow-lg shadow-emerald-500/5";
@@ -91,7 +126,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
   }, []);
 
   const getThreatIcon = useCallback((level: string) => {
-    switch (level?.toLowerCase()) {
+    switch ((level || '').toLowerCase()) {
       case "safe":
       case "low":
         return <ShieldCheck className="h-6 w-6 text-emerald-500 animate-pulse" />;
@@ -142,9 +177,9 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
       >
         <div className="flex items-center gap-5">
           <div className={`h-16 w-16 rounded-2xl flex items-center justify-center shrink-0 transition-transform hover:scale-105 ${
-              threatLevel.toLowerCase() === 'critical' || threatLevel.toLowerCase() === 'high'
+              (threatLevel || '').toLowerCase() === 'critical' || (threatLevel || '').toLowerCase() === 'high'
                 ? "bg-destructive/20 text-destructive"
-                : threatLevel.toLowerCase() === 'medium'
+                : (threatLevel || '').toLowerCase() === 'medium'
                 ? "bg-amber-500/20 text-amber-500"
                 : "bg-emerald-500/20 text-emerald-500"
             }`}
@@ -193,7 +228,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
                 </div>
               )}
 
-              {aiAnalysis.prevention_tips && aiAnalysis.prevention_tips.length > 0 && (
+              {Array.isArray(aiAnalysis.prevention_tips) && aiAnalysis.prevention_tips.length > 0 && (
                 <div className="bg-emerald-500/5 p-4 rounded-lg border border-emerald-500/20">
                   <h4 className="text-[11px] font-bold uppercase text-emerald-500 mb-2">Prevention Tips</h4>
                   <ul className="list-disc pl-4 space-y-1.5 text-sm text-foreground/80">
@@ -238,7 +273,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
                             {key.replace(/_/g, " ")}
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {val.map((item: string, idx: number) => (
+                            {Array.isArray(val) && val.map((item: string, idx: number) => (
                               <Badge key={idx} variant="secondary" className="font-mono text-xs">
                                 {item}
                               </Badge>
@@ -266,7 +301,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
                             {key.replace(/_/g, " ")}
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {val.map((item: string, idx: number) => (
+                            {Array.isArray(val) && val.map((item: string, idx: number) => (
                               <Badge key={idx} variant="secondary" className="font-mono text-xs">
                                 {item}
                               </Badge>
@@ -294,7 +329,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
                             {key.replace(/_/g, " ")}
                           </p>
                           <div className="flex flex-col gap-1">
-                            {val.map((item: string, idx: number) => (
+                            {Array.isArray(val) && val.map((item: string, idx: number) => (
                               <span key={idx} className="font-mono text-xs text-foreground truncate break-all">
                                 {item}
                               </span>
@@ -308,7 +343,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
               )}
 
               {/* Platforms */}
-              {entities.platforms && entities.platforms.length > 0 && (
+              {Array.isArray(entities.platforms) && entities.platforms.length > 0 && (
                 <div className="space-y-2 pt-2">
                   <h4 className="text-xs font-bold text-primary flex items-center gap-2">
                     <MessageSquare className="h-4 w-4" /> Affected Apps / Platforms
@@ -421,7 +456,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
             </CardHeader>
             {isRulesExpanded && (
               <CardContent className="space-y-4 pt-4">
-                {riskAnalysis.triggered_rules && riskAnalysis.triggered_rules.length > 0 ? (
+                {Array.isArray(riskAnalysis.triggered_rules) && riskAnalysis.triggered_rules.length > 0 ? (
                   <div className="space-y-2">
                     <h4 className="text-xs font-bold text-destructive flex items-center gap-2">
                       <XCircle className="h-4 w-4" /> Triggered Security Violations
@@ -515,9 +550,9 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
                     r="40"
                     fill="none"
                     stroke={
-                      threatLevel.toLowerCase() === 'safe' || threatLevel.toLowerCase() === 'low'
+                      (threatLevel || '').toLowerCase() === 'safe' || (threatLevel || '').toLowerCase() === 'low'
                         ? "#10b981" 
-                        : threatLevel.toLowerCase() === 'medium' 
+                        : (threatLevel || '').toLowerCase() === 'medium' 
                         ? "#f59e0b" 
                         : "#ef4444"
                     }
@@ -605,7 +640,7 @@ export function ScreenshotResultView({ report, isSavedReport = false }: Screensh
                         </div>
                       </div>
                       <div className="font-mono text-[10px] text-muted-foreground">
-                        {duration.toFixed(0)}ms
+                        {Number(duration).toFixed(0)}ms
                       </div>
                     </div>
                   ))}

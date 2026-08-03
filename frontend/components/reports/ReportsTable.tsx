@@ -145,8 +145,11 @@ export function ReportsTable() {
             </TableHeader>
             <TableBody>
               {safeReports.map((report) => {
-                const isQR = report.category === "QR Code";
-                const isScreenshot = report.evidenceType && report.evidenceType !== "Currency Note" && report.evidenceType !== "QR Code";
+                const isQR = report.evidenceType === "QR" || report.evidenceType === "QR Code" || report.selectedPipeline === "QR" || !!report.rawAiResponse?.qr_details;
+                const isURL = report.evidenceType === "URL" || report.selectedPipeline === "URL" || !!report.rawAiResponse?.original_url;
+                const isCurrency = report.evidenceType === "Currency Note" || report.evidenceType === "Currency" || report.selectedPipeline === "Currency" || !!report.denomination;
+                const isScreenshot = !isQR && !isURL && !isCurrency;
+                
                 const qrDetails = report.rawAiResponse?.qr_details;
                 const riskAnalysis = qrDetails?.risk_analysis;
                 const riskScore = riskAnalysis?.risk_score ?? 0;
@@ -156,8 +159,8 @@ export function ReportsTable() {
                   <TableRow key={report.id}>
                     <TableCell className="font-mono text-xs font-semibold text-primary">#{report.id.substring(0, 8)}...</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={isQR ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : isScreenshot ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"}>
-                        {isQR ? "QR Code" : isScreenshot ? "Screenshot" : "Currency"}
+                      <Badge variant="outline" className={isQR ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : isURL ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : isScreenshot ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"}>
+                        {isQR ? "QR Code" : isURL ? "URL" : isScreenshot ? "Screenshot" : "Currency"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -166,6 +169,13 @@ export function ReportsTable() {
                           <span className="font-bold text-foreground text-sm">{qrDetails?.qr_type || "Unknown QR"}</span>
                           <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[200px]" title={qrDetails?.decoded_value}>
                             {qrDetails?.decoded_value}
+                          </span>
+                        </div>
+                      ) : isURL ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-foreground text-sm">{report.rawAiResponse?.website_category || "URL Intelligence"}</span>
+                          <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[200px]" title={report.rawAiResponse?.final_url || report.rawAiResponse?.original_url}>
+                            {report.rawAiResponse?.final_url || report.rawAiResponse?.original_url}
                           </span>
                         </div>
                       ) : isScreenshot ? (
@@ -187,18 +197,33 @@ export function ReportsTable() {
                     <TableCell>
                       {isQR ? (
                         <span className={`inline-flex items-center gap-1 text-xs font-bold ${
-                          riskLevel.toLowerCase() === 'safe' || riskLevel.toLowerCase() === 'low'
+                          (riskLevel || '').toLowerCase() === 'safe' || (riskLevel || '').toLowerCase() === 'low'
                             ? "text-emerald-400"
-                            : riskLevel.toLowerCase() === 'medium'
+                            : (riskLevel || '').toLowerCase() === 'medium'
                             ? "text-amber-400"
                             : "text-destructive"
                         }`}>
-                          {riskLevel.toLowerCase() === 'safe' || riskLevel.toLowerCase() === 'low' ? (
+                          {(riskLevel || '').toLowerCase() === 'safe' || (riskLevel || '').toLowerCase() === 'low' ? (
                             <ShieldCheck className="h-3.5 w-3.5" />
                           ) : (
                             <ShieldAlert className="h-3.5 w-3.5" />
                           )}
                           {riskLevel} (Score: {riskScore})
+                        </span>
+                      ) : isURL ? (
+                        <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                          (report.rawAiResponse?.final_threat_level || '').toLowerCase() === 'safe' || (report.rawAiResponse?.final_threat_level || '').toLowerCase() === 'low'
+                            ? "text-emerald-400"
+                            : (report.rawAiResponse?.final_threat_level || '').toLowerCase() === 'medium'
+                            ? "text-amber-400"
+                            : "text-destructive"
+                        }`}>
+                          {(report.rawAiResponse?.final_threat_level || '').toLowerCase() === 'safe' || (report.rawAiResponse?.final_threat_level || '').toLowerCase() === 'low' ? (
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                          ) : (
+                            <ShieldAlert className="h-3.5 w-3.5" />
+                          )}
+                          {report.rawAiResponse?.final_threat_level || "Unknown"}
                         </span>
                       ) : isScreenshot ? (
                         <span className={`inline-flex items-center gap-1 text-xs font-bold ${

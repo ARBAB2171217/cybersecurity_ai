@@ -123,19 +123,7 @@ export function URLIntelligence() {
     try {
       const payload = {
         originalUrl: originalParsed.originalUrl,
-        finalUrl: finalParsed.originalUrl,
-        category: finalParsed.category,
-        ipType: finalParsed.ipType,
-        riskScore: securityAssessment.riskScore,
-        threatLevel: securityAssessment.threatLevel,
-        triggeredRules: securityAssessment.triggeredRules.map(r => ({
-          name: r.name,
-          status: r.status,
-          severity: r.severity,
-          reason: r.reason
-        })),
-        brandMatch: securityAssessment.brandMatch || {},
-        redirectChain: resolvedData || undefined
+        finalUrl: finalParsed.originalUrl
       };
 
       const aiResponse = await api.post("/detection/analyze-url", payload);
@@ -394,6 +382,7 @@ export function URLIntelligence() {
                   parsedFinal={parsedFinal}
                   brandMatch={assessment.brandMatch}
                   consistency={assessment.consistency}
+                  whois={aiAnalysis?.forensics?.whois}
                 />
 
                 {/* Security checks list */}

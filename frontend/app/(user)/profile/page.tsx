@@ -44,6 +44,47 @@ export default function ProfilePage() {
     };
   }, [safeReports, total]);
 
+  const chartData = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const investigations = Array(7).fill(0);
+    const accuracies = Array(7).fill(0);
+    const accuracyCounts = Array(7).fill(0);
+    const bookmarks = Array(7).fill(0);
+
+    safeReports.forEach(r => {
+      const rDate = new Date(r.createdAt);
+      rDate.setHours(0, 0, 0, 0);
+      const diffTime = today.getTime() - rDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays >= 0 && diffDays < 7) {
+        const idx = 6 - diffDays;
+        investigations[idx]++;
+        accuracies[idx] += (r.confidenceScore || r.classificationConfidence || 0);
+        accuracyCounts[idx]++;
+        if (r.isBookmarked) {
+          bookmarks[idx]++;
+        }
+      }
+    });
+
+    const maxInv = Math.max(...investigations, 1);
+    const invChart = investigations.map(v => Math.max((v / maxInv) * 100, 5)); 
+
+    const accChart = accuracies.map((v, i) => accuracyCounts[i] ? Math.max((v / accuracyCounts[i]) * 100, 5) : 5);
+
+    const maxBook = Math.max(...bookmarks, 1);
+    const bookChart = bookmarks.map(v => Math.max((v / maxBook) * 100, 5));
+
+    return {
+      investigations: invChart,
+      accuracy: accChart,
+      bookmarks: bookChart
+    };
+  }, [safeReports]);
+
   const initials = useMemo(() => {
     if (!user?.fullName) return "U";
     return user.fullName.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2);
@@ -128,8 +169,8 @@ export default function ProfilePage() {
                 <div className="text-xs text-muted-foreground font-semibold">Total Investigations</div>
                 <div className="text-2xl font-bold text-foreground">{stats.totalInvestigations.toLocaleString()}</div>
                 <div className="flex items-end gap-1 h-8 mt-2">
-                  {[10, 20, 30, 40, 25, 45, 60].map((h, i) => (
-                    <div key={i} className="flex-1 bg-primary/40 rounded-sm" style={{ height: `${h}%` }} />
+                  {chartData.investigations.map((h, i) => (
+                    <div key={i} className="flex-1 bg-primary/40 rounded-sm transition-all duration-500" style={{ height: `${h}%` }} />
                   ))}
                 </div>
               </CardContent>
@@ -140,8 +181,8 @@ export default function ProfilePage() {
                 <div className="text-xs text-muted-foreground font-semibold">Report Generation Accuracy</div>
                 <div className="text-2xl font-bold text-foreground">{stats.accuracy.toFixed(1)}%</div>
                 <div className="flex items-end gap-1 h-8 mt-2">
-                  {[20, 30, 20, 40, 30, 50, 70].map((h, i) => (
-                    <div key={i} className="flex-1 bg-primary/40 rounded-sm" style={{ height: `${h}%` }} />
+                  {chartData.accuracy.map((h, i) => (
+                    <div key={i} className="flex-1 bg-primary/40 rounded-sm transition-all duration-500" style={{ height: `${h}%` }} />
                   ))}
                 </div>
               </CardContent>
@@ -152,8 +193,8 @@ export default function ProfilePage() {
                 <div className="text-xs text-muted-foreground font-semibold">Active Bookmarks</div>
                 <div className="text-2xl font-bold text-foreground">{stats.bookmarksCount}</div>
                 <div className="flex items-end gap-1 h-8 mt-2">
-                  {[5, 10, 5, 15, 10, 20, 10].map((h, i) => (
-                    <div key={i} className="flex-1 bg-primary/40 rounded-sm" style={{ height: `${h}%` }} />
+                  {chartData.bookmarks.map((h, i) => (
+                    <div key={i} className="flex-1 bg-primary/40 rounded-sm transition-all duration-500" style={{ height: `${h}%` }} />
                   ))}
                 </div>
               </CardContent>

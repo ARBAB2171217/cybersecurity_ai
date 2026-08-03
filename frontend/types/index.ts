@@ -79,6 +79,8 @@ export interface RawAiResponse {
   status: "GENUINE" | "FAKE" | "SUSPICIOUS";
   confidence: number;
   risk_score: number;
+  qr_detected?: boolean;
+  qr_type?: string;
   ocr_text?: string;
   entities?: Record<string, any>;
   risk_analysis?: {
@@ -150,4 +152,9 @@ export interface RawAiResponse {
       final_recommendation?: string;
     };
   };
+  original_url?: string;
+  final_url?: string;
+  final_threat_level?: string;
+  website_category?: string;
+  [key: string]: any;
 }

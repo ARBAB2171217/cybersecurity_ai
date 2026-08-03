@@ -106,11 +106,35 @@ export default function DetectionResultPage() {
 
   if (!result) return null;
 
-  const report: Report = result;
+  // Ensure rawAiResponse is an object, parsing it if the backend returned a string
+  let parsedAi = result.rawAiResponse || (result as any).raw_ai_response;
+  if (typeof parsedAi === "string") {
+    try {
+      parsedAi = JSON.parse(parsedAi);
+    } catch (e) {
+      console.error("Failed to parse rawAiResponse", e);
+    }
+  }
+
+  // Normalize snake_case properties from backend
+  const report: Report = {
+    ...result,
+    evidenceType: result.evidenceType || (result as any).evidence_type,
+    selectedPipeline: result.selectedPipeline || (result as any).selected_pipeline,
+    rawAiResponse: parsedAi,
+    isCounterfeit: result.isCounterfeit ?? (result as any).is_counterfeit,
+    confidenceScore: result.confidenceScore ?? (result as any).confidence_score,
+    createdAt: result.createdAt || (result as any).created_at || new Date().toISOString(),
+    ocrText: result.ocrText || (result as any).ocr_text,
+    imageUrl: result.imageUrl || (result as any).image_url,
+    serialNumber: result.serialNumber || (result as any).serial_number,
+  };
+
   const ai = report.rawAiResponse as RawAiResponse | null | undefined;
   const isCounterfeit = report.isCounterfeit;
   const riskScore = ai?.risk_score ?? (isCounterfeit ? 85 : 15);
   const reasons = ai?.reasons ?? [];
+
 
   return (
     <PageContainer>
@@ -514,7 +538,7 @@ export default function DetectionResultPage() {
                     const left = xmin / 10;
                     const height = (ymax - ymin) / 10;
                     const width = (xmax - xmin) / 10;
-                    const isSuspicious = highlight.status.toLowerCase() === 'suspicious' || highlight.status.toLowerCase() === 'missing';
+                    const isSuspicious = (highlight.status || '').toLowerCase() === 'suspicious' || (highlight.status || '').toLowerCase() === 'missing';
                     const color = isSuspicious ? 'border-destructive bg-destructive/20 text-destructive' : 'border-emerald-500 bg-emerald-500/20 text-emerald-500';
                     return (
                       <div
@@ -616,7 +640,7 @@ export default function DetectionResultPage() {
                       <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-1.5rem)] p-2 rounded-lg border border-border/20 bg-zinc-950/20">
                         <div className="flex justify-between items-center text-[10px]">
                           <span className="font-bold text-foreground">{step}</span>
-                          <span className="font-mono text-muted-foreground">{duration.toFixed(1)}ms</span>
+                          <span className="font-mono text-muted-foreground">{Number(duration || 0).toFixed(1)}ms</span>
                         </div>
                       </div>
                     </div>

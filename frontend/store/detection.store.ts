@@ -22,7 +22,7 @@ interface DetectionActions {
 }
 
 export const useDetectionStore = create<DetectionState & DetectionActions>()(
-  (set) => ({
+  (set, get) => ({
     // ── State
     result: null,
     status: "idle",
@@ -45,6 +45,11 @@ export const useDetectionStore = create<DetectionState & DetectionActions>()(
           set({ result: res.data, status: "success", progress: 100 });
           // Return the reportId so the caller can navigate to the result page
           const reportId = res.data.report_id ?? res.data.id;
+          
+          // Immediately fetch the fully hydrated database record so the UI has all fields (like evidenceType)
+          if (reportId) {
+            await get().fetchResult(reportId);
+          }
           
           if (!reportId) {
               console.error(
