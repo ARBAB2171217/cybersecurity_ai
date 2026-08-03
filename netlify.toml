@@ -1,7 +1,6 @@
 [build]
   base = "frontend"
   command = "npm run build"
-  publish = ".next"
 
 [build.environment]
   NPM_CONFIG_LEGACY_PEER_DEPS = "true"
